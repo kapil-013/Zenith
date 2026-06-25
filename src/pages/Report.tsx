@@ -1,0 +1,908 @@
+import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { NeumorphicCard } from "../components/ui/card";
+import { NeumorphicButton } from "../components/ui/button";
+import { NeumorphicInput } from "../components/ui/input";
+import { NeumorphicTextarea } from "../components/ui/textarea";
+import { ImageUploadDropzone } from "../components/ui/image-upload";
+import { NeumorphicBadge } from "../components/ui/badge";
+import { useAuth } from "../context/AuthContext";
+import { useToast } from "../context/ToastContext";
+import { db, storage } from "../lib/firebase";
+import {
+  collection,
+  addDoc,
+  serverTimestamp,
+  getDocs,
+  query,
+  where,
+  updateDoc,
+  doc,
+  increment,
+} from "firebase/firestore";
+import {
+  MapPin,
+  BrainCircuit,
+  ShieldAlert,
+  ArrowRight,
+  CheckCircle2,
+  Copy,
+  Navigation,
+  Search,
+} from "lucide-react";
+import { motion, AnimatePresence } from "motion/react";
+import { calculatePriorityScore } from "../lib/utils";
+
+// Haversine formula to calculate distance between two lat/lng coordinates in meters
+function getDistanceFromLatLonInM(
+  lat1: number,
+  lon1: number,
+  lat2: number,
+  lon2: number,
+) {
+  const R = 6371e3; // Radius of the earth in m
+  const dLat = (lat2 - lat1) * (Math.PI / 180);
+  const dLon = (lon2 - lon1) * (Math.PI / 180);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * (Math.PI / 180)) *
+      Math.cos(lat2 * (Math.PI / 180)) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+export function Report() {
+  const { user, signInWithGoogle } = useAuth();
+  const navigate = useNavigate();
+  const { addToast } = useToast();
+
+  const [description, setDescription] = useState("");
+  const [address, setAddress] = useState("");
+  const [locationType, setLocationType] = useState("road");
+  const [image, setImage] = useState<{
+    base64: string;
+    mimeType: string;
+  } | null>(null);
+
+  const [lat, setLat] = useState<number | null>(null);
+  const [lng, setLng] = useState<number | null>(null);
+  const [locationStatus, setLocationStatus] = useState<
+    "none" | "detected" | "manual" | "fallback"
+  >("none");
+  const [isLocating, setIsLocating] = useState(false);
+
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analysisResult, setAnalysisResult] = useState<any>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const [manualMode, setManualMode] = useState(false);
+  const [spamConfirmed, setSpamConfirmed] = useState(false);
+
+  const [duplicateCandidate, setDuplicateCandidate] = useState<any>(null);
+
+  const handleGetLocation = () => {
+    setIsLocating(true);
+    if (!navigator.geolocation) {
+      addToast("Geolocation is not supported by your browser.", "error");
+      setLat(28.6139); // Fallback: New Delhi
+      setLng(77.209);
+      setLocationStatus("fallback");
+      setIsLocating(false);
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setLat(position.coords.latitude);
+        setLng(position.coords.longitude);
+        setLocationStatus("detected");
+        setIsLocating(false);
+        addToast("Location detected successfully.", "success");
+      },
+      () => {
+        addToast("Unable to retrieve your location. Using fallback.", "error");
+        setLat(28.6139); // Fallback: New Delhi
+        setLng(77.209);
+        setLocationStatus("fallback");
+        setIsLocating(false);
+      },
+    );
+  };
+
+  const findDuplicate = async (
+    category: string,
+    userAddress: string,
+    userDesc: string,
+    userLat: number | null,
+    userLng: number | null,
+  ) => {
+    try {
+      const q = query(
+        collection(db, "issues"),
+        where("category", "==", category),
+      );
+      const snapshot = await getDocs(q);
+      const existingIssues = snapshot.docs
+        .map((d) => ({ id: d.id, ...d.data() }) as any)
+        .filter((i) => ["Open", "Verified", "In Progress"].includes(i.status));
+
+      for (const issue of existingIssues) {
+        if (
+          userLat !== null &&
+          userLng !== null &&
+          issue.location &&
+          issue.location.lat !== 0 &&
+          issue.location.lng !== 0
+        ) {
+          const dist = getDistanceFromLatLonInM(
+            userLat,
+            userLng,
+            issue.location.lat,
+            issue.location.lng,
+          );
+          if (dist <= 150) {
+            return issue;
+          }
+        } else {
+          // Fallback to text similarity
+          const getWords = (text: string) =>
+            text
+              .toLowerCase()
+              .split(/\W+/)
+              .filter((w) => w.length > 4);
+          const addrWords = getWords(userAddress);
+          const descWords = getWords(userDesc);
+
+          const issueAddrWords = getWords(issue.address || "");
+          const issueDescWords = getWords(issue.description || "");
+
+          const addrMatch =
+            addrWords.length > 0 &&
+            addrWords.some((w) => issueAddrWords.includes(w));
+          const descMatch =
+            descWords.length > 0 &&
+            descWords.filter((w) => issueDescWords.includes(w)).length >= 2;
+
+          if (addrMatch || descMatch) {
+            return issue;
+          }
+        }
+      }
+      return null;
+    } catch (e) {
+      console.error("Duplicate check failed", e);
+      return null;
+    }
+  };
+
+  const handleAnalyze = async () => {
+    if (!description && !image) {
+      addToast("Please provide an image or description first.", "error");
+      return;
+    }
+
+    setIsAnalyzing(true);
+    try {
+      const res = await fetch("/api/analyze-issue", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          description,
+          address,
+          locationType,
+          imageBase64: image?.base64,
+          mimeType: image?.mimeType,
+        }),
+      });
+
+      if (!res.ok) throw new Error("Analysis failed");
+      const data = await res.json();
+      setAnalysisResult(data);
+      addToast("AI analysis complete.", "success");
+    } catch (error) {
+      console.error(error);
+      addToast(
+        "Failed to analyze the issue. Switched to manual mode.",
+        "error",
+      );
+      setManualMode(true);
+      // Setup empty default result for manual mode
+      setAnalysisResult({
+        title: "Manual Civic Report",
+        category: "Other",
+        severity: "Medium",
+        confidence: 0,
+        suggestedDepartment: "General Civic Helpdesk",
+        citizenSummary:
+          description.substring(0, 100) +
+          (description.length > 100 ? "..." : ""),
+        authoritySummary: "Manually reported issue pending review.",
+        riskReason: "Pending human review.",
+        spamRisk: "Low",
+        verificationQuestion: "Can you confirm this issue exists?",
+        recommendedAction: "Investigate reported location.",
+        priorityHints: ["Manually reported by citizen"],
+      });
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  const handleSubmit = async (ignoreDuplicate = false) => {
+    if (!user) {
+      addToast("Please sign in to submit.", "error");
+      return;
+    }
+    if (!analysisResult) {
+      addToast("Please analyze the issue first.", "error");
+      return;
+    }
+
+    if (analysisResult.spamRisk === "High" && !spamConfirmed) {
+      addToast(
+        "High spam risk detected. Please confirm this is a valid report.",
+        "error",
+      );
+      return;
+    }
+
+    if (!ignoreDuplicate) {
+      setIsSubmitting(true);
+      const dup = await findDuplicate(
+        analysisResult.category,
+        address,
+        description,
+        lat,
+        lng,
+      );
+      setIsSubmitting(false);
+      if (dup) {
+        setDuplicateCandidate(dup);
+        return;
+      }
+    }
+
+    setIsSubmitting(true);
+    try {
+      const initialIssueData = {
+        severity: analysisResult.severity,
+        locationType: locationType,
+        spamRisk: analysisResult.spamRisk,
+        verificationCount: 0,
+        duplicateCount: 0, // Since we ignored duplicate
+        status: "Open",
+      };
+
+      const { score, reasons } = calculatePriorityScore(initialIssueData);
+
+      let finalLat = lat;
+      let finalLng = lng;
+      let finalLocationStatus = locationStatus !== "none" ? locationStatus : "detected";
+
+      if (finalLat === null || finalLng === null) {
+        // Always use Delhi NCR fallback if location not detected, even if address is empty,
+        // because we never want to save lat: 0, lng: 0
+        finalLat = 28.6139; // Fallback New Delhi
+        finalLng = 77.209;
+        finalLocationStatus = address.trim() !== "" ? "manual" : "fallback";
+      }
+      
+      let uploadedImageUrl = "";
+      if (image?.base64) {
+        try {
+          const { ref, uploadString, getDownloadURL } = await import("firebase/storage");
+          const storageRef = ref(storage, `issues/${user.id}/${Date.now()}.jpg`);
+          // Note: image.base64 might contain data URL prefix, we need to handle that or upload the whole string
+          // If it's a data_url:
+          const isDataUrl = image.base64.startsWith('data:');
+          const dataToUpload = isDataUrl ? image.base64 : `data:${image.mimeType};base64,${image.base64}`;
+          await uploadString(storageRef, dataToUpload, 'data_url');
+          uploadedImageUrl = await getDownloadURL(storageRef);
+        } catch (storageErr) {
+          console.error("Storage upload failed, falling back to base64", storageErr);
+          // Check if base64 string is under a safe size for Firestore document (~800KB)
+          if (image.base64.length < 800000) {
+            addToast("Using compressed image preview for MVP demo fallback.", "info");
+            uploadedImageUrl = image.base64; // fallback
+          } else {
+            addToast("Image too large and Storage failed. Please try a smaller image.", "error");
+            setIsSubmitting(false);
+            return;
+          }
+        }
+      }
+
+      const newIssue = {
+        title: manualMode
+          ? description.split("\n")[0].substring(0, 40) || "Civic Issue"
+          : analysisResult.title,
+        description,
+        imageUrl: uploadedImageUrl,
+        category: analysisResult.category,
+        severity: analysisResult.severity,
+        confidence: manualMode ? 1 : analysisResult.confidence,
+        location: { lat: finalLat, lng: finalLng },
+        locationStatus: finalLocationStatus,
+        address,
+        locationType,
+        suggestedDepartment: analysisResult.suggestedDepartment,
+        citizenSummary: manualMode
+          ? description
+          : analysisResult.citizenSummary,
+        authoritySummary: analysisResult.authoritySummary,
+        riskReason: analysisResult.riskReason,
+        spamRisk: analysisResult.spamRisk,
+        verificationQuestion: analysisResult.verificationQuestion,
+        recommendedAction: analysisResult.recommendedAction,
+        status: "Open",
+        priorityScore: score,
+        priorityReasons: reasons,
+        verificationCount: 0,
+        disputeCount: 0,
+        duplicateCount: 0,
+        confirmedResolvedCount: 0,
+        duplicateOf: null,
+        createdBy: user.id,
+        assignedTo: null,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      };
+
+      const docRef = await addDoc(collection(db, "issues"), newIssue);
+
+      // Add initial status update
+      await addDoc(collection(db, "status_updates"), {
+        issueId: docRef.id,
+        status: "Open",
+        note: "Issue reported by citizen.",
+        updatedBy: user.id,
+        createdAt: Date.now(),
+      });
+
+      addToast("Issue reported successfully!", "success");
+      navigate(`/issues/${docRef.id}`);
+    } catch (error) {
+      console.error(error);
+      addToast("Failed to submit issue.", "error");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleVerifyDuplicate = async () => {
+    if (!duplicateCandidate || !user) return;
+    setIsSubmitting(true);
+    try {
+      const issueRef = doc(db, "issues", duplicateCandidate.id);
+      const verificationsRef = collection(db, "verifications");
+
+      await addDoc(verificationsRef, {
+        issueId: duplicateCandidate.id,
+        userId: user.id,
+        type: "verify",
+        createdAt: Date.now(),
+      });
+
+      const { score, reasons } = calculatePriorityScore({
+        ...duplicateCandidate,
+        verificationCount: (duplicateCandidate.verificationCount || 0) + 1,
+      });
+
+      await updateDoc(issueRef, {
+        verificationCount: increment(1),
+        priorityScore: score,
+        priorityReasons: reasons,
+      });
+
+      await addDoc(collection(db, "status_updates"), {
+        issueId: duplicateCandidate.id,
+        status: duplicateCandidate.status,
+        note: "Issue verified as duplicate report.",
+        updatedBy: user.id,
+        createdAt: Date.now(),
+      });
+
+      addToast("Verified existing issue.", "success");
+      navigate(`/issues/${duplicateCandidate.id}`);
+    } catch (e) {
+      console.error(e);
+      addToast("Failed to verify existing issue.", "error");
+      setIsSubmitting(false);
+    }
+  };
+
+  if (!user) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh]">
+        <NeumorphicCard className="p-8 text-center max-w-md">
+          <ShieldAlert className="h-12 w-12 text-blue-500 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold mb-4">Sign In to Report</h2>
+          <p className="text-slate-600 mb-6">
+            You need to be signed in to report a civic issue and earn
+            contribution points.
+          </p>
+          <NeumorphicButton
+            onClick={signInWithGoogle}
+            variant="primary"
+            className="w-full"
+          >
+            Sign In with Google
+          </NeumorphicButton>
+        </NeumorphicCard>
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+      <div className="flex items-center gap-3 mb-2">
+        <div className="p-3 bg-[#e9eef5] rounded-xl shadow-[inset_2px_2px_4px_#b8bec5,inset_-2px_-2px_4px_#ffffff]">
+          <ShieldAlert className="h-6 w-6 text-blue-600" />
+        </div>
+        <h1 className="text-3xl font-bold text-slate-800">Report an Issue</h1>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* Left Column: Input */}
+        <div className="space-y-6">
+          <NeumorphicCard className="p-6 space-y-6">
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-2">
+                Photo Evidence
+              </label>
+              <ImageUploadDropzone
+                onImageSelected={(b, m) => setImage({ base64: b, mimeType: m })}
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-2">
+                Description
+              </label>
+              <NeumorphicTextarea
+                placeholder="What is the exact problem?"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+              />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="md:col-span-2">
+                <label className="block text-sm font-semibold text-slate-700 mb-2">
+                  Location
+                </label>
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <MapPin className="absolute left-3 top-3.5 h-5 w-5 text-slate-400" />
+                    <NeumorphicInput
+                      placeholder="E.g. Main St, near school"
+                      className="pl-10"
+                      value={address}
+                      onChange={(e) => setAddress(e.target.value)}
+                    />
+                  </div>
+                  <NeumorphicButton
+                    variant="ghost"
+                    className="shrink-0 px-4"
+                    onClick={handleGetLocation}
+                    disabled={isLocating}
+                  >
+                    {isLocating ? (
+                      <BrainCircuit className="h-5 w-5 animate-spin" />
+                    ) : (
+                      <Navigation className="h-5 w-5 text-blue-500" />
+                    )}
+                    <span className="ml-2 hidden sm:inline">Detect</span>
+                  </NeumorphicButton>
+                </div>
+
+                {(locationStatus !== "none" || address.trim() !== "") && (
+                  <div
+                    className={`mt-2 text-xs px-3 py-2 rounded-lg flex items-center gap-2 ${
+                      locationStatus === "detected"
+                        ? "bg-green-50 text-green-700 border border-green-200"
+                        : locationStatus === "fallback"
+                          ? "bg-amber-50 text-amber-700 border border-amber-200"
+                          : "bg-blue-50 text-blue-700 border border-blue-200"
+                    }`}
+                  >
+                    <Navigation className="h-3 w-3" />
+                    {locationStatus === "detected"
+                      ? "Precise location detected"
+                      : locationStatus === "fallback"
+                        ? "Using demo fallback location"
+                        : "Manual address entered (will use demo fallback coordinates)"}
+                    {lat && lng && locationStatus !== "none"
+                      ? ` (${lat.toFixed(4)}, ${lng.toFixed(4)})`
+                      : ""}
+                  </div>
+                )}
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="block text-sm font-semibold text-slate-700 mb-2">
+                  Location Type
+                </label>
+                <select
+                  className="flex h-12 w-full rounded-xl bg-[#e9eef5] px-4 py-2 text-sm text-slate-800 shadow-[inset_4px_4px_8px_#b8bec5,inset_-4px_-4px_8px_#ffffff] focus:outline-none"
+                  value={locationType}
+                  onChange={(e) => setLocationType(e.target.value)}
+                >
+                  <option value="road">Road / Street</option>
+                  <option value="school">Near School</option>
+                  <option value="hospital">Near Hospital</option>
+                  <option value="market">Market / Commercial</option>
+                  <option value="residential">Residential Area</option>
+                  <option value="park">Public Park</option>
+                  <option value="bus stop">Transit Stop</option>
+                  <option value="high-footfall area">High Footfall Area</option>
+                </select>
+              </div>
+            </div>
+
+            <NeumorphicButton
+              className="w-full gap-2"
+              variant="primary"
+              onClick={handleAnalyze}
+              disabled={isAnalyzing || (!description && !image)}
+            >
+              {isAnalyzing ? (
+                <div className="animate-pulse flex items-center gap-2">
+                  <BrainCircuit className="h-5 w-5 animate-spin" />
+                  Analyzing with CivicVision AI...
+                </div>
+              ) : (
+                <>
+                  <BrainCircuit className="h-5 w-5" />
+                  Analyze with AI
+                </>
+              )}
+            </NeumorphicButton>
+          </NeumorphicCard>
+        </div>
+
+        {/* Right Column: AI Analysis & Submit */}
+        <div className="space-y-6">
+          {!analysisResult ? (
+            <NeumorphicCard
+              className={`p-12 flex flex-col items-center justify-center text-center h-full min-h-[400px] border-dashed border-2 ${isAnalyzing ? "border-blue-300" : "border-slate-300 opacity-70"} transition-all`}
+            >
+              {isAnalyzing ? (
+                <>
+                  <div className="relative">
+                    <BrainCircuit className="h-16 w-16 text-blue-500 mb-4 animate-pulse relative z-10" />
+                    <div className="absolute inset-0 bg-blue-400 blur-xl opacity-30 rounded-full animate-ping"></div>
+                  </div>
+                  <h3 className="text-xl font-bold text-slate-800 mb-2">
+                    CivicVision AI is analyzing image evidence...
+                  </h3>
+                  <p className="text-sm text-slate-500 max-w-sm animate-pulse">
+                    Scanning image evidence, estimating severity, and
+                    determining the responsible department.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <BrainCircuit className="h-16 w-16 text-slate-400 mb-4 opacity-50" />
+                  <h3 className="text-xl font-bold text-slate-500 mb-2">
+                    Waiting for AI Analysis
+                  </h3>
+                  <p className="text-sm text-slate-500 max-w-sm">
+                    Provide a photo and description, then click "Analyze with
+                    AI" to generate a structured civic report.
+                  </p>
+                </>
+              )}
+            </NeumorphicCard>
+          ) : (
+            <NeumorphicCard className="p-6 space-y-6 animate-in fade-in zoom-in-95">
+              <div className="flex items-center justify-between border-b border-slate-200/50 pb-4">
+                <div className="flex items-center gap-2 text-blue-600 font-bold">
+                  <CheckCircle2 className="h-5 w-5" />
+                  AI Analysis Complete
+                </div>
+                <div className="text-sm text-slate-500 flex items-center gap-2">
+                  <span>Confidence:</span>
+                  <div className="w-24 h-2 bg-slate-200 rounded-full overflow-hidden shadow-inner">
+                    <div 
+                      className={`h-full ${analysisResult.confidence >= 0.8 ? 'bg-green-500' : analysisResult.confidence >= 0.6 ? 'bg-amber-500' : 'bg-red-500'}`}
+                      style={{ width: `${Math.round(analysisResult.confidence * 100)}%` }}
+                    />
+                  </div>
+                  <span className="font-bold text-slate-800">
+                    {(analysisResult.confidence * 100).toFixed(0)}%
+                  </span>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <h2 className="text-2xl font-bold text-slate-800 leading-tight mb-2">
+                    {analysisResult.title}
+                  </h2>
+
+                  {analysisResult.confidence < 0.55 && !manualMode && (
+                    <div className="mb-4 bg-amber-50 border border-amber-200 text-amber-800 px-3 py-2 rounded-lg text-sm flex items-start gap-2">
+                      <ShieldAlert className="h-4 w-4 mt-0.5 shrink-0" />
+                      <p>
+                        AI confidence is low. Please review and adjust the
+                        category or severity before submitting.
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="flex flex-wrap gap-2">
+                    <select
+                      className="text-xs font-semibold px-3 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200 focus:outline-none appearance-none cursor-pointer"
+                      value={analysisResult.category}
+                      onChange={(e) =>
+                        setAnalysisResult({
+                          ...analysisResult,
+                          category: e.target.value,
+                        })
+                      }
+                    >
+                      <option value="Pothole">Pothole</option>
+                      <option value="Garbage Overflow">Garbage Overflow</option>
+                      <option value="Water Leakage">Water Leakage</option>
+                      <option value="Broken Streetlight">
+                        Broken Streetlight
+                      </option>
+                      <option value="Sewage Issue">Sewage Issue</option>
+                      <option value="Road Blockage">Road Blockage</option>
+                      <option value="Damaged Infrastructure">
+                        Damaged Infrastructure
+                      </option>
+                      <option value="Unsafe Public Area">
+                        Unsafe Public Area
+                      </option>
+                      <option value="Other">Other</option>
+                    </select>
+
+                    <select
+                      className={`text-xs font-semibold px-3 py-1 rounded-full border focus:outline-none appearance-none cursor-pointer ${
+                        analysisResult.severity === "Critical" ||
+                        analysisResult.severity === "High"
+                          ? "bg-red-50 text-red-700 border-red-200"
+                          : analysisResult.severity === "Medium"
+                            ? "bg-amber-50 text-amber-700 border-amber-200"
+                            : "bg-slate-100 text-slate-700 border-slate-200"
+                      }`}
+                      value={analysisResult.severity}
+                      onChange={(e) =>
+                        setAnalysisResult({
+                          ...analysisResult,
+                          severity: e.target.value,
+                        })
+                      }
+                    >
+                      <option value="Low">Low</option>
+                      <option value="Medium">Medium</option>
+                      <option value="High">High</option>
+                      <option value="Critical">Critical</option>
+                    </select>
+
+                    <NeumorphicBadge variant="default">
+                      {analysisResult.suggestedDepartment}
+                    </NeumorphicBadge>
+                  </div>
+                </div>
+
+                <div className="bg-[#e9eef5] p-4 rounded-xl shadow-[inset_2px_2px_4px_#b8bec5,inset_-2px_-2px_4px_#ffffff]">
+                  <p className="text-sm text-slate-700 italic">
+                    "{analysisResult.citizenSummary}"
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="font-semibold text-slate-600">
+                      Risk Reason:
+                    </span>
+                    <span className="text-slate-800 text-right max-w-[60%]">
+                      {analysisResult.riskReason}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="font-semibold text-slate-600">
+                      Recommended Action:
+                    </span>
+                    <span className="text-slate-800 text-right max-w-[60%]">
+                      {analysisResult.recommendedAction}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="font-semibold text-slate-600">
+                      Spam Risk:
+                    </span>
+                    <span
+                      className={`text-right ${analysisResult.spamRisk === "High" ? "text-red-600 font-bold" : "text-slate-800"}`}
+                    >
+                      {analysisResult.spamRisk}
+                    </span>
+                  </div>
+                </div>
+
+                {analysisResult.spamRisk === "High" && (
+                  <div className="bg-red-50 p-3 rounded-lg border border-red-200">
+                    <label className="flex items-start gap-2 text-sm text-red-800 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        className="mt-1"
+                        checked={spamConfirmed}
+                        onChange={(e) => setSpamConfirmed(e.target.checked)}
+                      />
+                      <span>
+                        This report was flagged as High spam risk. I confirm
+                        this is a real and valid civic issue.
+                      </span>
+                    </label>
+                  </div>
+                )}
+
+                <div className="pt-4 border-t border-slate-200/50">
+                  <p className="text-xs text-slate-500 font-semibold mb-1 uppercase tracking-wider">
+                    Verification Question
+                  </p>
+                  <p className="text-sm text-slate-800 font-medium">
+                    {analysisResult.verificationQuestion}
+                  </p>
+                </div>
+
+                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 rounded-xl border border-blue-100 flex items-center justify-between">
+                  <div className="space-y-1">
+                    <p className="text-xs font-bold uppercase tracking-wider text-blue-600">
+                      Priority Preview
+                    </p>
+                    <p className="text-sm text-slate-700">
+                      Estimated initial impact score
+                    </p>
+                  </div>
+                  <div className="flex items-center justify-center w-12 h-12 rounded-full bg-white shadow-[2px_2px_4px_#b8bec5,-2px_-2px_4px_#ffffff] font-black text-blue-600 text-lg">
+                    {
+                      calculatePriorityScore({
+                        severity: analysisResult.severity,
+                        locationType: locationType,
+                        spamRisk: analysisResult.spamRisk,
+                        verificationCount: 0,
+                        duplicateCount: 0,
+                        status: "Open",
+                      }).score
+                    }
+                  </div>
+                </div>
+
+                <div className="pt-2">
+                  <p className="text-sm text-slate-500 italic mb-3">
+                    Please review the details above before submitting.
+                  </p>
+                  <NeumorphicButton
+                    className="w-full gap-2"
+                    variant="primary"
+                    onClick={() => handleSubmit()}
+                    disabled={isSubmitting}
+                  >
+                    {isSubmitting ? (
+                      "Submitting..."
+                    ) : (
+                      <>
+                        Submit Civic Report <ArrowRight className="h-5 w-5" />
+                      </>
+                    )}
+                  </NeumorphicButton>
+                </div>
+              </div>
+            </NeumorphicCard>
+          )}
+        </div>
+      </div>
+
+      <AnimatePresence>
+        {duplicateCandidate && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="w-full max-w-lg"
+            >
+              <NeumorphicCard className="p-6 sm:p-8 relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-amber-100 rounded-full blur-3xl -mr-16 -mt-16 opacity-60 pointer-events-none"></div>
+
+                <div className="flex items-center gap-3 mb-6 relative z-10">
+                  <div className="p-2.5 bg-amber-50 text-amber-600 rounded-full border border-amber-200">
+                    <Copy className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-bold text-slate-800">
+                      Possible duplicate found
+                    </h2>
+                    <p className="text-sm text-slate-500">
+                      A similar issue already exists nearby.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="bg-[#e9eef5] rounded-xl p-5 mb-6 shadow-[inset_2px_2px_4px_#b8bec5,inset_-2px_-2px_4px_#ffffff] relative z-10">
+                  <div className="flex justify-between items-start mb-3">
+                    <h3 className="font-bold text-slate-800 leading-tight">
+                      {duplicateCandidate.title}
+                    </h3>
+                    <NeumorphicBadge variant="info" className="shrink-0 ml-2">
+                      {duplicateCandidate.category}
+                    </NeumorphicBadge>
+                  </div>
+
+                  <div className="space-y-2 text-sm text-slate-600">
+                    <div className="flex justify-between">
+                      <span className="font-medium">Status:</span>
+                      <span className="font-bold text-slate-800">
+                        {duplicateCandidate.status}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="font-medium">Location:</span>
+                      <span
+                        className="text-slate-800 text-right max-w-[65%] truncate"
+                        title={duplicateCandidate.address}
+                      >
+                        {duplicateCandidate.address}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center pt-2 border-t border-slate-200/50 mt-2">
+                      <div className="flex items-center gap-1.5 text-blue-600">
+                        <CheckCircle2 className="h-4 w-4" />
+                        <span className="font-bold">
+                          {duplicateCandidate.verificationCount} verifications
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-medium text-slate-500 uppercase text-xs tracking-wider">
+                          Priority
+                        </span>
+                        <span
+                          className={`font-black ${duplicateCandidate.priorityScore >= 81 ? "text-red-500" : "text-amber-500"}`}
+                        >
+                          {duplicateCandidate.priorityScore}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <p className="text-sm text-slate-600 mb-6 relative z-10">
+                  You can verify the existing issue instead of creating a
+                  duplicate report. This helps prioritize the problem faster!
+                </p>
+
+                <div className="flex flex-col sm:flex-row gap-3 relative z-10">
+                  <NeumorphicButton
+                    className="flex-1 font-bold"
+                    variant="primary"
+                    onClick={handleVerifyDuplicate}
+                    disabled={isSubmitting}
+                  >
+                    Verify existing issue
+                  </NeumorphicButton>
+                  <NeumorphicButton
+                    className="flex-1"
+                    variant="ghost"
+                    onClick={() => {
+                      setDuplicateCandidate(null);
+                      handleSubmit(true);
+                    }}
+                    disabled={isSubmitting}
+                  >
+                    Submit as new issue
+                  </NeumorphicButton>
+                </div>
+              </NeumorphicCard>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
