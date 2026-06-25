@@ -15,7 +15,7 @@ const ai = new GoogleGenAI({
 
 async function startServer() {
   const app = express();
-  const PORT = 3000;
+  const PORT = Number(process.env.PORT) || 3000;
 
   app.use(express.json({ limit: "50mb" }));
 
@@ -99,7 +99,7 @@ Behavior rules:
       const jsonStr = text.trim();
       const result = JSON.parse(jsonStr);
       
-      res.json(result);
+      res.json({ ...result, isFallback: false });
     } catch (error) {
       console.error("Gemini API Error:", error);
       res.json({
@@ -114,7 +114,8 @@ Behavior rules:
         spamRisk: "Medium",
         verificationQuestion: "Can you confirm if this issue is still present?",
         recommendedAction: "Review manually.",
-        priorityHints: ["Needs manual review due to AI analysis failure"]
+        priorityHints: ["Needs manual review due to AI analysis failure"],
+        isFallback: true
       });
     }
   });

@@ -61,3 +61,17 @@ Note: Firebase configuration is injected via AI Studio Firebase integration.
 - Real-time notifications (SMS/Email) for status changes.
 - Multilingual support for broader citizen accessibility.
 - Drone integration for AI-based city scanning.
+
+## Deployment Health Check
+Before final submission, confirm the deployed app is stable:
+- Open deployed app in incognito.
+- Test Report Issue.
+- Test Analyze with AI.
+- Confirm AI card says Gemini, not fallback.
+- Submit issue.
+- Verify issue.
+- Enable Demo Admin.
+- Assign department.
+- Change status.
+- Confirm resolution.
+- View Impact dashboard.

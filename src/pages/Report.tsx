@@ -224,6 +224,7 @@ export function Report() {
         verificationQuestion: "Can you confirm this issue exists?",
         recommendedAction: "Investigate reported location.",
         priorityHints: ["Manually reported by citizen"],
+        isFallback: true,
       });
     } finally {
       setIsAnalyzing(false);
@@ -304,7 +305,7 @@ export function Report() {
           console.error("Storage upload failed, falling back to base64", storageErr);
           // Check if base64 string is under a safe size for Firestore document (~800KB)
           if (image.base64.length < 800000) {
-            addToast("Using compressed image preview for MVP demo fallback.", "info");
+            addToast("Image Storage fallback active. Using compressed preview for demo.", "info");
             uploadedImageUrl = image.base64; // fallback
           } else {
             addToast("Image too large and Storage failed. Please try a smaller image.", "error");
@@ -599,9 +600,20 @@ export function Report() {
           ) : (
             <NeumorphicCard className="p-6 space-y-6 animate-in fade-in zoom-in-95">
               <div className="flex items-center justify-between border-b border-slate-200/50 pb-4">
-                <div className="flex items-center gap-2 text-blue-600 font-bold">
-                  <CheckCircle2 className="h-5 w-5" />
-                  AI Analysis Complete
+                <div className="flex flex-col gap-1">
+                  <div className="flex items-center gap-2 text-blue-600 font-bold">
+                    <CheckCircle2 className="h-5 w-5" />
+                    AI Analysis Complete
+                  </div>
+                  {analysisResult.isFallback ? (
+                    <span className="text-xs text-amber-600 font-medium">
+                      AI fallback mode is active. Gemini response was unavailable, so demo-safe analysis was used.
+                    </span>
+                  ) : (
+                    <span className="text-xs text-slate-500 font-medium">
+                      Analyzed by CivicVision AI using Gemini.
+                    </span>
+                  )}
                 </div>
                 <div className="text-sm text-slate-500 flex items-center gap-2">
                   <span>Confidence:</span>

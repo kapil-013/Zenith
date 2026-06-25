@@ -37,7 +37,7 @@ export function IssueDetail() {
   const { user, signInWithGoogle } = useAuth();
   const { addToast } = useToast();
   const [issue, setIssue] = useState<Issue | null>(null);
-  const [userAction, setUserAction] = useState<Verification | null>(null);
+  const [userActions, setUserActions] = useState<Verification[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -57,10 +57,11 @@ export function IssueDetail() {
         );
         const verifSnap = await getDocs(q);
         if (!verifSnap.empty) {
-          setUserAction({
-            id: verifSnap.docs[0].id,
-            ...verifSnap.docs[0].data(),
-          } as Verification);
+          const actions = verifSnap.docs.map(d => ({
+            id: d.id,
+            ...d.data(),
+          } as Verification));
+          setUserActions(actions);
         }
       }
       setLoading(false);
@@ -76,8 +77,8 @@ export function IssueDetail() {
       return;
     }
     if (!issue) return;
-    if (userAction) {
-      addToast("You have already submitted an action for this issue.", "error");
+    if (userActions.some((a) => a.type === type)) {
+      addToast("You have already performed this action.", "error");
       return;
     }
 
@@ -132,8 +133,37 @@ export function IssueDetail() {
       }
 
       addToast("Thank you for your civic contribution!", "success");
-      // Soft refresh instead of window.reload? Window reload is fine for MVP.
-      window.location.reload();
+      
+      const newAction: Verification = {
+        id: Math.random().toString(),
+        issueId: issue.id,
+        userId: user.id,
+        type,
+        createdAt: Date.now(),
+      };
+      setUserActions(prev => [...prev, newAction]);
+      
+      setIssue(prev => {
+        if (!prev) return prev;
+        const newIssue = { ...prev };
+        if (type === "verify") {
+          const { score, reasons } = calculatePriorityScore({
+            ...newIssue,
+            verificationCount: (newIssue.verificationCount || 0) + 1,
+            status: newIssue.status === "Open" ? "Verified" : newIssue.status,
+          });
+          newIssue.verificationCount = (newIssue.verificationCount || 0) + 1;
+          newIssue.status = newIssue.status === "Open" ? "Verified" : newIssue.status;
+          newIssue.priorityScore = score;
+          newIssue.priorityReasons = reasons;
+        } else if (type === "dispute") {
+          newIssue.disputeCount = (newIssue.disputeCount || 0) + 1;
+        } else if (type === "confirm_resolved") {
+          newIssue.confirmedResolvedCount = (newIssue.confirmedResolvedCount || 0) + 1;
+          newIssue.status = "Confirmed";
+        }
+        return newIssue;
+      });
     } catch (e) {
       console.error(e);
       addToast("Failed to submit action", "error");
@@ -387,14 +417,32 @@ export function IssueDetail() {
             </div>
 
             <div className="space-y-3">
-              {userAction ? (
+              {userActions.some(a => a.type === "verify") && (
                 <NeumorphicBadge
                   variant="success"
                   className="w-full justify-center py-2.5 text-sm font-bold"
                 >
-                  You have recorded your response.
+                  You verified this issue.
                 </NeumorphicBadge>
-              ) : (
+              )}
+              {userActions.some(a => a.type === "dispute") && (
+                <NeumorphicBadge
+                  variant="danger"
+                  className="w-full justify-center py-2.5 text-sm font-bold"
+                >
+                  You disputed this issue.
+                </NeumorphicBadge>
+              )}
+              {userActions.some(a => a.type === "confirm_resolved") && (
+                <NeumorphicBadge
+                  variant="success"
+                  className="w-full justify-center py-2.5 text-sm font-bold"
+                >
+                  You confirmed resolution.
+                </NeumorphicBadge>
+              )}
+
+              {!userActions.some(a => a.type === "verify" || a.type === "dispute") && (
                 <>
                   <NeumorphicButton
                     className="w-full font-bold hover:-translate-y-0.5 transition-transform"
@@ -413,7 +461,7 @@ export function IssueDetail() {
                 </>
               )}
 
-              {issue.status === "Resolved" && !userAction && (
+              {issue.status === "Resolved" && !userActions.some(a => a.type === "confirm_resolved") && (
                 <NeumorphicButton
                   className="w-full mt-4 font-bold animate-pulse hover:animate-none"
                   variant="success"

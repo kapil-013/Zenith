@@ -17,7 +17,10 @@ service cloud.firestore {
     match /issues/{issueId} {
       allow read: if true;
       allow create: if isSignedIn();
-      allow update: if isSignedIn(); // Allow regular users to update issues (verifications, etc.)
+      allow update: if isSignedIn() && (
+        isAdmin() || 
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['verificationCount', 'disputeCount', 'duplicateCount', 'confirmedResolvedCount', 'updatedAt', 'status', 'priorityScore', 'priorityReasons'])
+      );
       allow delete: if isAdmin();
     }
 
