@@ -23,18 +23,11 @@ import {
   Cell,
   ResponsiveContainer,
   Tooltip,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
 } from "recharts";
 import {
   LayoutDashboard,
   CheckCircle2,
   AlertTriangle,
-  Clock,
-  ArrowRight,
   ShieldAlert,
   Users,
   X,
@@ -44,7 +37,7 @@ import { motion, AnimatePresence } from "motion/react";
 import { AIInsightCard, InsightData } from "../components/AIInsightCard";
 
 export function Admin() {
-  const { user } = useAuth();
+  const { user, role } = useAuth();
   const { addToast } = useToast();
   const [issues, setIssues] = useState<Issue[]>([]);
   const [insight, setInsight] = useState<InsightData | null>(null);
@@ -67,10 +60,10 @@ export function Admin() {
   }, []);
 
   useEffect(() => {
-    if (issues.length > 0 && !insight && !loadingInsight && user?.role === "Admin") {
+    if (issues.length > 0 && !insight && !loadingInsight && role === "admin") {
       generateInsight(issues);
     }
-  }, [issues, user]);
+  }, [issues, role]);
 
   const generateInsight = async (issuesList: any[]) => {
     setLoadingInsight(true);
@@ -174,17 +167,6 @@ export function Admin() {
     }
   };
 
-  const handleEnableDemoAdmin = async () => {
-    if (!user) return;
-    try {
-      await updateDoc(doc(db, "users", user.id), { role: "Admin" });
-      addToast("Admin access enabled. Please refresh the page.", "success");
-      setTimeout(() => window.location.reload(), 1500);
-    } catch (e) {
-      addToast("Failed to enable admin access.", "error");
-    }
-  };
-
   if (!user) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
@@ -197,16 +179,13 @@ export function Admin() {
     );
   }
 
-  if (user.role !== "Admin") {
+  if (role !== "admin") {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <NeumorphicCard className="p-12 text-center flex flex-col items-center max-w-md w-full">
           <ShieldAlert className="h-16 w-16 text-red-400 mb-6" />
           <h2 className="text-2xl font-bold text-slate-800 mb-2">Admin Access Required</h2>
-          <p className="text-slate-500 mb-8">You do not have permission to view the command center.</p>
-          <NeumorphicButton variant="primary" onClick={handleEnableDemoAdmin}>
-            Enable Demo Admin
-          </NeumorphicButton>
+          <p className="text-slate-500">You do not have permission to view the command center.</p>
         </NeumorphicCard>
       </div>
     );
@@ -252,14 +231,14 @@ export function Admin() {
     >
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
         <div className="flex items-center gap-3">
-          <div className="p-3 bg-[#e9eef5] rounded-xl shadow-[inset_2px_2px_4px_#b8bec5,inset_-2px_-2px_4px_#ffffff]">
-            <ShieldAlert className="h-6 w-6 text-slate-800" />
+          <div className="p-3 bg-[var(--color-civic-admin-soft)] rounded-xl shadow-[var(--shadow-neumorphic-inset)] border border-transparent">
+            <ShieldAlert className="h-6 w-6 text-[var(--color-civic-admin)]" />
           </div>
           <div>
-            <h1 className="text-3xl font-bold text-slate-800 uppercase tracking-tight">
+            <h1 className="text-3xl font-extrabold text-[var(--color-civic-text-primary)] uppercase tracking-tight">
               Command Center
             </h1>
-            <p className="text-slate-600 font-medium">
+            <p className="text-[var(--color-civic-text-secondary)] font-bold">
               Civic Operations & Issue Tracking
             </p>
           </div>
@@ -268,7 +247,7 @@ export function Admin() {
           <NeumorphicButton onClick={handleLoadDemoData}>
             Load Demo Data
           </NeumorphicButton>
-          <NeumorphicButton variant="primary" onClick={handleResetDemoData}>
+          <NeumorphicButton variant="admin" onClick={handleResetDemoData}>
             Reset Demo Data
           </NeumorphicButton>
         </div>
@@ -282,12 +261,12 @@ export function Admin() {
         >
           <NeumorphicCard className="p-6 flex items-center justify-between h-full hover:scale-[1.02] transition-transform">
             <div>
-              <p className="text-sm font-semibold text-slate-500 uppercase tracking-wider">
+              <p className="text-sm font-bold text-[var(--color-civic-text-muted)] uppercase tracking-widest">
                 Total Reports
               </p>
-              <p className="text-4xl font-black text-slate-800 mt-2">{total}</p>
+              <p className="text-4xl font-black text-[var(--color-civic-text-primary)] mt-2">{total}</p>
             </div>
-            <div className="p-4 bg-blue-100 rounded-2xl text-blue-600 shadow-sm">
+            <div className="p-4 bg-[var(--color-civic-primary)]/10 rounded-2xl text-[var(--color-civic-primary)] shadow-sm">
               <LayoutDashboard className="h-8 w-8" />
             </div>
           </NeumorphicCard>
@@ -300,14 +279,14 @@ export function Admin() {
         >
           <NeumorphicCard className="p-6 flex items-center justify-between h-full hover:scale-[1.02] transition-transform">
             <div>
-              <p className="text-sm font-semibold text-slate-500 uppercase tracking-wider">
+              <p className="text-sm font-bold text-[var(--color-civic-text-muted)] uppercase tracking-widest">
                 High Priority Queue
               </p>
-              <p className="text-4xl font-black text-red-500 mt-2">
+              <p className="text-4xl font-black text-[var(--color-civic-danger)] mt-2">
                 {highPriority}
               </p>
             </div>
-            <div className="p-4 bg-red-100 rounded-2xl text-red-600 shadow-sm">
+            <div className="p-4 bg-[var(--color-civic-danger)]/10 rounded-2xl text-[var(--color-civic-danger)] shadow-sm">
               <AlertTriangle className="h-8 w-8" />
             </div>
           </NeumorphicCard>
@@ -320,14 +299,14 @@ export function Admin() {
         >
           <NeumorphicCard className="p-6 flex items-center justify-between h-full hover:scale-[1.02] transition-transform">
             <div>
-              <p className="text-sm font-semibold text-slate-500 uppercase tracking-wider">
+              <p className="text-sm font-bold text-[var(--color-civic-text-muted)] uppercase tracking-widest">
                 Resolved / Confirmed
               </p>
-              <p className="text-4xl font-black text-green-500 mt-2">
+              <p className="text-4xl font-black text-[var(--color-civic-status-confirmed)] mt-2">
                 {resolved}
               </p>
             </div>
-            <div className="p-4 bg-green-100 rounded-2xl text-green-600 shadow-sm">
+            <div className="p-4 bg-[var(--color-civic-status-confirmed)]/10 rounded-2xl text-[var(--color-civic-status-confirmed)] shadow-sm">
               <CheckCircle2 className="h-8 w-8" />
             </div>
           </NeumorphicCard>
@@ -341,7 +320,7 @@ export function Admin() {
           transition={{ delay: 0.4 }}
         >
           <NeumorphicCard className="p-6 h-full">
-            <h3 className="font-bold text-lg text-slate-800 mb-6">
+            <h3 className="font-extrabold text-xl text-[var(--color-civic-text-primary)] mb-6">
               Reports by Category
             </h3>
             <div className="h-64 w-full">
@@ -368,8 +347,10 @@ export function Admin() {
                     contentStyle={{
                       borderRadius: "16px",
                       border: "none",
-                      boxShadow: "6px 6px 12px #b8bec5, -6px -6px 12px #ffffff",
-                      backgroundColor: "#e9eef5",
+                      boxShadow: "var(--shadow-neumorphic)",
+                      backgroundColor: "var(--color-civic-surface)",
+                      color: "var(--color-civic-text-primary)",
+                      fontWeight: "bold"
                     }}
                   />
                 </PieChart>
@@ -391,9 +372,9 @@ export function Admin() {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.6 }}
-        className="text-2xl font-bold text-slate-800 pt-4 flex items-center gap-2"
+        className="text-2xl font-extrabold text-[var(--color-civic-text-primary)] pt-4 flex items-center gap-2 tracking-tight"
       >
-        <AlertTriangle className="h-6 w-6 text-red-500" />
+        <AlertTriangle className="h-6 w-6 text-[var(--color-civic-danger)]" />
         Urgent Action Queue
       </motion.h2>
 
@@ -409,18 +390,18 @@ export function Admin() {
             >
               <NeumorphicCard className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:scale-[1.01] transition-transform">
                 <div className="flex items-center gap-4">
-                  <div className="flex-shrink-0 w-16 h-16 rounded-2xl bg-[#e9eef5] shadow-[inset_4px_4px_8px_#b8bec5,inset_-4px_-4px_8px_#ffffff] flex items-center justify-center">
+                  <div className="flex-shrink-0 w-16 h-16 rounded-2xl bg-[var(--color-civic-surface-inset)] shadow-[var(--shadow-neumorphic-inset)] flex items-center justify-center border border-transparent">
                     <span
-                      className={`text-xl font-black ${issue.priorityScore >= 61 ? "text-red-500" : "text-amber-500"}`}
+                      className={`text-xl font-black ${issue.priorityScore >= 61 ? "text-[var(--color-civic-danger)]" : "text-[var(--color-civic-priority-medium)]"}`}
                     >
                       {issue.priorityScore}
                     </span>
                   </div>
                   <div>
-                    <h4 className="font-bold text-slate-800 text-lg">
+                    <h4 className="font-extrabold text-[var(--color-civic-text-primary)] text-lg">
                       {issue.title}
                     </h4>
-                    <p className="text-sm text-slate-500">{issue.address}</p>
+                    <p className="text-sm text-[var(--color-civic-text-secondary)] font-medium">{issue.address}</p>
                     <div className="flex flex-wrap gap-2 mt-2 items-center">
                       <NeumorphicBadge>{issue.category}</NeumorphicBadge>
                       <NeumorphicBadge
@@ -431,7 +412,7 @@ export function Admin() {
                         {issue.status}
                       </NeumorphicBadge>
                       {issue.assignedTo && (
-                        <span className="text-xs font-semibold text-slate-500 flex items-center gap-1">
+                        <span className="text-xs font-bold text-[var(--color-civic-text-muted)] flex items-center gap-1">
                           <Users className="h-3 w-3" />
                           {issue.assignedTo}
                         </span>
@@ -441,7 +422,7 @@ export function Admin() {
                 </div>
                 <div className="flex flex-col gap-3 min-w-[160px]">
                   <select
-                    className="text-sm p-2.5 rounded-xl font-medium text-slate-700 bg-[#e9eef5] shadow-[inset_4px_4px_8px_#b8bec5,inset_-4px_-4px_8px_#ffffff] focus:outline-none focus:ring-2 focus:ring-blue-400"
+                    className="text-sm p-2.5 rounded-xl font-bold text-[var(--color-civic-text-primary)] bg-[var(--color-civic-surface-inset)] shadow-[var(--shadow-neumorphic-inset)] focus:outline-none focus:ring-2 focus:ring-[var(--color-civic-admin)]/50 border border-transparent appearance-none"
                     value={issue.status}
                     onChange={(e) =>
                       handleUpdateStatus(issue.id, e.target.value)
@@ -454,7 +435,7 @@ export function Admin() {
                   </select>
                   <NeumorphicButton
                     size="sm"
-                    variant="ghost"
+                    variant="admin"
                     className="w-full"
                     onClick={() => {
                       setSelectedIssueId(issue.id);
@@ -486,18 +467,18 @@ export function Admin() {
               exit={{ scale: 0.95, opacity: 0 }}
               className="w-full max-w-md"
             >
-              <NeumorphicCard className="p-6 relative">
+              <NeumorphicCard className="p-6 relative border-t-4 border-[var(--color-civic-admin)]">
                 <button
                   onClick={() => setAssignModalOpen(false)}
-                  className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 transition-colors"
+                  className="absolute top-4 right-4 text-[var(--color-civic-text-muted)] hover:text-[var(--color-civic-text-primary)] transition-colors"
                 >
                   <X className="h-5 w-5" />
                 </button>
-                <h3 className="text-xl font-bold text-slate-800 mb-6">Assign Department</h3>
+                <h3 className="text-xl font-extrabold text-[var(--color-civic-text-primary)] mb-6">Assign Department</h3>
                 
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                    <label className="block text-sm font-bold text-[var(--color-civic-text-secondary)] mb-2 uppercase tracking-widest">
                       Department / Team Name
                     </label>
                     <NeumorphicInput
@@ -507,7 +488,7 @@ export function Admin() {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                    <label className="block text-sm font-bold text-[var(--color-civic-text-secondary)] mb-2 uppercase tracking-widest">
                       Note (Optional)
                     </label>
                     <NeumorphicTextarea
@@ -521,7 +502,7 @@ export function Admin() {
                     <NeumorphicButton className="flex-1" onClick={() => setAssignModalOpen(false)}>
                       Cancel
                     </NeumorphicButton>
-                    <NeumorphicButton variant="primary" className="flex-1" onClick={handleAssignDeptSubmit} disabled={!assignDept.trim()}>
+                    <NeumorphicButton variant="admin" className="flex-1" onClick={handleAssignDeptSubmit} disabled={!assignDept.trim()}>
                       Save Assignment
                     </NeumorphicButton>
                   </div>

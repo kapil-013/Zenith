@@ -108,15 +108,15 @@ export function Impact() {
           initial={{ scale: 0.8 }}
           animate={{ scale: 1 }}
           transition={{ delay: 0.1 }}
-          className="inline-flex p-4 bg-[#e9eef5] rounded-full shadow-[inset_2px_2px_4px_#b8bec5,inset_-2px_-2px_4px_#ffffff] mb-6"
+          className="inline-flex p-4 bg-[var(--color-civic-surface-inset)] rounded-full shadow-[var(--shadow-neumorphic-inset)] border border-transparent mb-6"
         >
-          <BarChart3 className="h-10 w-10 text-blue-600" />
+          <BarChart3 className="h-10 w-10 text-[var(--color-civic-primary)]" />
         </motion.div>
         <motion.h1
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
-          className="text-4xl font-bold text-slate-800 mb-4"
+          className="text-4xl font-extrabold text-[var(--color-civic-text-primary)] tracking-tight mb-4"
         >
           Community Impact
         </motion.h1>
@@ -124,7 +124,7 @@ export function Impact() {
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
-          className="text-lg text-slate-600"
+          className="text-lg text-[var(--color-civic-text-secondary)] font-medium"
         >
           See how active citizens and responsible authorities are transforming
           your neighborhood.
@@ -141,7 +141,7 @@ export function Impact() {
             title="Total Reports"
             value={issues.length}
             icon={TrendingUp}
-            color="text-blue-500"
+            color="text-[var(--color-civic-primary)]"
           />
         </motion.div>
         <motion.div
@@ -153,7 +153,7 @@ export function Impact() {
             title="Resolved Issues"
             value={resolved}
             icon={HeartHandshake}
-            color="text-green-500"
+            color="text-[var(--color-civic-status-confirmed)]"
           />
         </motion.div>
         <motion.div
@@ -165,7 +165,7 @@ export function Impact() {
             title="Issues Verified"
             value={verified}
             icon={CheckCircle2Icon}
-            color="text-amber-500"
+            color="text-[var(--color-civic-priority-medium)]"
           />
         </motion.div>
         <motion.div
@@ -177,7 +177,7 @@ export function Impact() {
             title="Citizen Actions"
             value={totalVerifications}
             icon={Users}
-            color="text-indigo-500"
+            color="text-[var(--color-civic-admin)]"
           />
         </motion.div>
       </div>
@@ -189,7 +189,7 @@ export function Impact() {
           transition={{ delay: 0.8 }}
         >
           <NeumorphicCard className="p-8 h-full">
-            <h3 className="font-bold text-lg text-slate-800 mb-6">
+            <h3 className="font-extrabold text-xl text-[var(--color-civic-text-primary)] mb-6">
               Resolution Pipeline
             </h3>
             <div className="h-72 w-full">
@@ -198,32 +198,34 @@ export function Impact() {
                   <CartesianGrid
                     strokeDasharray="3 3"
                     vertical={false}
-                    stroke="#cbd5e1"
+                    stroke="rgba(0,0,0,0.1)"
                   />
                   <XAxis
                     dataKey="name"
                     axisLine={false}
                     tickLine={false}
-                    tick={{ fill: "#64748b" }}
+                    tick={{ fill: "var(--color-civic-text-secondary)", fontWeight: 600, fontSize: 12 }}
                     dy={10}
                   />
                   <YAxis
                     axisLine={false}
                     tickLine={false}
-                    tick={{ fill: "#64748b" }}
+                    tick={{ fill: "var(--color-civic-text-secondary)", fontWeight: 600, fontSize: 12 }}
                   />
                   <Tooltip
-                    cursor={{ fill: "#e2e8f0", opacity: 0.4 }}
+                    cursor={{ fill: "rgba(0,0,0,0.05)" }}
                     contentStyle={{
                       borderRadius: "16px",
                       border: "none",
-                      boxShadow: "6px 6px 12px #b8bec5, -6px -6px 12px #ffffff",
-                      backgroundColor: "#e9eef5",
+                      boxShadow: "var(--shadow-neumorphic)",
+                      backgroundColor: "var(--color-civic-surface)",
+                      color: "var(--color-civic-text-primary)",
+                      fontWeight: "bold"
                     }}
                   />
                   <Bar
                     dataKey="count"
-                    fill="#3b82f6"
+                    fill="var(--color-civic-primary)"
                     radius={[6, 6, 0, 0]}
                     barSize={40}
                   />
@@ -249,11 +251,11 @@ function MetricCard({ title, value, icon: Icon, color }: any) {
   return (
     <NeumorphicCard className="p-6 text-center flex flex-col items-center h-full hover:scale-[1.02] transition-transform">
       <div
-        className={`p-3 bg-[#e9eef5] rounded-xl shadow-[inset_2px_2px_4px_#b8bec5,inset_-2px_-2px_4px_#ffffff] mb-4 ${color}`}
+        className={`p-3 bg-[var(--color-civic-surface-inset)] rounded-xl shadow-[var(--shadow-neumorphic-inset)] border border-transparent mb-4 ${color}`}
       >
         <Icon className="h-6 w-6" />
       </div>
-      <p className="text-sm font-semibold text-slate-500 uppercase tracking-wider">
+      <p className="text-sm font-bold text-[var(--color-civic-text-secondary)] uppercase tracking-widest">
         {title}
       </p>
       <p className={`text-4xl font-black mt-2 ${color}`}>{value}</p>

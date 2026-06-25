@@ -8,7 +8,7 @@ const NeumorphicCard = React.forwardRef<
   <div
     ref={ref}
     className={cn(
-      "rounded-2xl bg-[#e9eef5] shadow-[6px_6px_12px_#b8bec5,-6px_-6px_12px_#ffffff] border border-white/40",
+      "rounded-2xl bg-[var(--color-civic-surface)] shadow-[var(--shadow-neumorphic)] border border-[var(--color-civic-border)]",
       className,
     )}
     {...props}
@@ -23,7 +23,7 @@ const NeumorphicCardInset = React.forwardRef<
   <div
     ref={ref}
     className={cn(
-      "rounded-2xl bg-[#e9eef5] shadow-[inset_4px_4px_8px_#b8bec5,inset_-4px_-4px_8px_#ffffff]",
+      "rounded-2xl bg-[var(--color-civic-surface-inset)] shadow-[var(--shadow-neumorphic-inset)] border border-[var(--color-civic-border)]/50",
       className,
     )}
     {...props}

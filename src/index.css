@@ -1,12 +1,63 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
 @import "tailwindcss";
 
 @theme {
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+  
+  --color-civic-bg: #EEF1EC;
+  --color-civic-surface: #F5F7F2;
+  --color-civic-surface-inset: #E2E7DF;
+  
+  --color-civic-text-primary: #1F2933;
+  --color-civic-text-secondary: #5E6C75;
+  --color-civic-text-muted: #8A979E;
+  
+  --color-civic-border: #D5DDD2;
+  
+  --color-civic-primary: #0F766E;
+  --color-civic-primary-dark: #115E59;
+  --color-civic-primary-soft: #CCFBF1;
+  
+  --color-civic-secondary: #4D7C0F;
+  --color-civic-secondary-soft: #ECFCCB;
+  
+  --color-civic-admin: #7C3AED;
+  --color-civic-admin-soft: #EDE9FE;
+  
+  --color-civic-department: #D97706;
+  --color-civic-department-soft: #FEF3C7;
+  
+  --color-civic-status-open: #64748B;
+  --color-civic-status-verified: #0F766E;
+  --color-civic-status-inprogress: #D97706;
+  --color-civic-status-resolved: #4D7C0F;
+  --color-civic-status-confirmed: #166534;
+  
+  --color-civic-priority-low: #64748B;
+  --color-civic-priority-medium: #D97706;
+  --color-civic-priority-high: #EA580C;
+  --color-civic-priority-urgent: #DC2626;
+  --color-civic-danger: #991B1B;
+  
+  --color-cat-pothole: #92400E;
+  --color-cat-garbage: #4D7C0F;
+  --color-cat-water: #0284C7;
+  --color-cat-light: #CA8A04;
+  --color-cat-sewage: #7C2D12;
+  --color-cat-road: #EA580C;
+  --color-cat-infra: #475569;
+  --color-cat-unsafe: #DC2626;
+  --color-cat-other: #64748B;
+  
+  --shadow-neumorphic: 8px 8px 18px rgba(117, 132, 114, 0.20), -8px -8px 18px rgba(255, 255, 255, 0.85);
+  --shadow-neumorphic-inset: inset 6px 6px 12px rgba(117, 132, 114, 0.18), inset -6px -6px 12px rgba(255, 255, 255, 0.9);
+  --shadow-neumorphic-floating: 14px 18px 40px rgba(31, 41, 51, 0.12), -10px -10px 24px rgba(255, 255, 255, 0.75);
 }
 
 @layer base {
   body {
-    @apply bg-gradient-to-br from-[#e9eef5] to-[#f6f8fb] text-slate-800 antialiased min-h-screen;
+    background-color: var(--color-civic-bg);
+    color: var(--color-civic-text-primary);
+    @apply antialiased min-h-[100dvh];
   }
 }

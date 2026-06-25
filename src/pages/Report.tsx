@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { NeumorphicCard } from "../components/ui/card";
+import { NeumorphicCard, NeumorphicCardInset } from "../components/ui/card";
 import { NeumorphicButton } from "../components/ui/button";
 import { NeumorphicInput } from "../components/ui/input";
 import { NeumorphicTextarea } from "../components/ui/textarea";
@@ -29,6 +29,7 @@ import {
   Copy,
   Navigation,
   Search,
+  Sparkles
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { calculatePriorityScore } from "../lib/utils";
@@ -418,9 +419,9 @@ export function Report() {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh]">
         <NeumorphicCard className="p-8 text-center max-w-md">
-          <ShieldAlert className="h-12 w-12 text-blue-500 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold mb-4">Sign In to Report</h2>
-          <p className="text-slate-600 mb-6">
+          <ShieldAlert className="h-12 w-12 text-[var(--color-civic-primary)] mx-auto mb-4" />
+          <h2 className="text-2xl font-bold mb-4 text-[var(--color-civic-text-primary)]">Sign In to Report</h2>
+          <p className="text-[var(--color-civic-text-secondary)] font-medium mb-6">
             You need to be signed in to report a civic issue and earn
             contribution points.
           </p>
@@ -439,18 +440,18 @@ export function Report() {
   return (
     <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
       <div className="flex items-center gap-3 mb-2">
-        <div className="p-3 bg-[#e9eef5] rounded-xl shadow-[inset_2px_2px_4px_#b8bec5,inset_-2px_-2px_4px_#ffffff]">
-          <ShieldAlert className="h-6 w-6 text-blue-600" />
+        <div className="p-3 bg-[var(--color-civic-surface-inset)] rounded-xl shadow-[var(--shadow-neumorphic-inset)] border border-transparent">
+          <ShieldAlert className="h-6 w-6 text-[var(--color-civic-primary)]" />
         </div>
-        <h1 className="text-3xl font-bold text-slate-800">Report an Issue</h1>
+        <h1 className="text-3xl font-extrabold text-[var(--color-civic-text-primary)] tracking-tight">Report an Issue</h1>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Left Column: Input */}
         <div className="space-y-6">
-          <NeumorphicCard className="p-6 space-y-6">
+          <NeumorphicCard className="p-6 space-y-6 border-t-4 border-t-[var(--color-civic-primary)]">
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-2">
+              <label className="block text-sm font-bold text-[var(--color-civic-text-primary)] mb-2 uppercase tracking-widest">
                 Photo Evidence
               </label>
               <ImageUploadDropzone
@@ -459,7 +460,7 @@ export function Report() {
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-2">
+              <label className="block text-sm font-bold text-[var(--color-civic-text-primary)] mb-2 uppercase tracking-widest">
                 Description
               </label>
               <NeumorphicTextarea
@@ -471,12 +472,12 @@ export function Report() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="md:col-span-2">
-                <label className="block text-sm font-semibold text-slate-700 mb-2">
+                <label className="block text-sm font-bold text-[var(--color-civic-text-primary)] mb-2 uppercase tracking-widest">
                   Location
                 </label>
                 <div className="flex gap-2">
                   <div className="relative flex-1">
-                    <MapPin className="absolute left-3 top-3.5 h-5 w-5 text-slate-400" />
+                    <MapPin className="absolute left-3 top-3.5 h-5 w-5 text-[var(--color-civic-text-muted)]" />
                     <NeumorphicInput
                       placeholder="E.g. Main St, near school"
                       className="pl-10"
@@ -485,15 +486,15 @@ export function Report() {
                     />
                   </div>
                   <NeumorphicButton
-                    variant="ghost"
+                    variant="secondary"
                     className="shrink-0 px-4"
                     onClick={handleGetLocation}
                     disabled={isLocating}
                   >
                     {isLocating ? (
-                      <BrainCircuit className="h-5 w-5 animate-spin" />
+                      <BrainCircuit className="h-5 w-5 animate-spin text-[var(--color-civic-primary)]" />
                     ) : (
-                      <Navigation className="h-5 w-5 text-blue-500" />
+                      <Navigation className="h-5 w-5 text-[var(--color-civic-primary)]" />
                     )}
                     <span className="ml-2 hidden sm:inline">Detect</span>
                   </NeumorphicButton>
@@ -501,12 +502,12 @@ export function Report() {
 
                 {(locationStatus !== "none" || address.trim() !== "") && (
                   <div
-                    className={`mt-2 text-xs px-3 py-2 rounded-lg flex items-center gap-2 ${
+                    className={`mt-2 text-xs px-3 py-2 rounded-lg flex items-center gap-2 font-bold ${
                       locationStatus === "detected"
-                        ? "bg-green-50 text-green-700 border border-green-200"
+                        ? "bg-[var(--color-civic-status-confirmed)]/10 text-[var(--color-civic-status-confirmed)] border border-[var(--color-civic-status-confirmed)]/20"
                         : locationStatus === "fallback"
-                          ? "bg-amber-50 text-amber-700 border border-amber-200"
-                          : "bg-blue-50 text-blue-700 border border-blue-200"
+                          ? "bg-[var(--color-civic-priority-medium)]/10 text-[var(--color-civic-priority-medium)] border border-[var(--color-civic-priority-medium)]/20"
+                          : "bg-[var(--color-civic-primary)]/10 text-[var(--color-civic-primary)] border border-[var(--color-civic-primary)]/20"
                     }`}
                   >
                     <Navigation className="h-3 w-3" />
@@ -523,11 +524,11 @@ export function Report() {
               </div>
 
               <div className="md:col-span-2">
-                <label className="block text-sm font-semibold text-slate-700 mb-2">
+                <label className="block text-sm font-bold text-[var(--color-civic-text-primary)] mb-2 uppercase tracking-widest">
                   Location Type
                 </label>
                 <select
-                  className="flex h-12 w-full rounded-xl bg-[#e9eef5] px-4 py-2 text-sm text-slate-800 shadow-[inset_4px_4px_8px_#b8bec5,inset_-4px_-4px_8px_#ffffff] focus:outline-none"
+                  className="flex h-12 w-full rounded-xl bg-[var(--color-civic-surface-inset)] px-4 py-2 text-sm font-semibold text-[var(--color-civic-text-primary)] shadow-[var(--shadow-neumorphic-inset)] focus:outline-none focus:ring-2 focus:ring-[var(--color-civic-primary)]/50 transition-all border border-transparent appearance-none"
                   value={locationType}
                   onChange={(e) => setLocationType(e.target.value)}
                 >
@@ -545,7 +546,7 @@ export function Report() {
 
             <NeumorphicButton
               className="w-full gap-2"
-              variant="primary"
+              variant="admin"
               onClick={handleAnalyze}
               disabled={isAnalyzing || (!description && !image)}
             >
@@ -556,7 +557,7 @@ export function Report() {
                 </div>
               ) : (
                 <>
-                  <BrainCircuit className="h-5 w-5" />
+                  <Sparkles className="h-5 w-5" />
                   Analyze with AI
                 </>
               )}
@@ -567,63 +568,63 @@ export function Report() {
         {/* Right Column: AI Analysis & Submit */}
         <div className="space-y-6">
           {!analysisResult ? (
-            <NeumorphicCard
-              className={`p-12 flex flex-col items-center justify-center text-center h-full min-h-[400px] border-dashed border-2 ${isAnalyzing ? "border-blue-300" : "border-slate-300 opacity-70"} transition-all`}
+            <NeumorphicCardInset
+              className={`p-12 flex flex-col items-center justify-center text-center h-full min-h-[400px] border-dashed border-2 ${isAnalyzing ? "border-[var(--color-civic-admin)]" : "border-[var(--color-civic-border)] opacity-70"} transition-all`}
             >
               {isAnalyzing ? (
                 <>
                   <div className="relative">
-                    <BrainCircuit className="h-16 w-16 text-blue-500 mb-4 animate-pulse relative z-10" />
-                    <div className="absolute inset-0 bg-blue-400 blur-xl opacity-30 rounded-full animate-ping"></div>
+                    <BrainCircuit className="h-16 w-16 text-[var(--color-civic-admin)] mb-4 animate-pulse relative z-10" />
+                    <div className="absolute inset-0 bg-[var(--color-civic-admin-soft)] blur-xl opacity-80 rounded-full animate-ping"></div>
                   </div>
-                  <h3 className="text-xl font-bold text-slate-800 mb-2">
+                  <h3 className="text-xl font-bold text-[var(--color-civic-text-primary)] mb-2">
                     CivicVision AI is analyzing image evidence...
                   </h3>
-                  <p className="text-sm text-slate-500 max-w-sm animate-pulse">
+                  <p className="text-sm text-[var(--color-civic-text-secondary)] font-medium max-w-sm animate-pulse">
                     Scanning image evidence, estimating severity, and
                     determining the responsible department.
                   </p>
                 </>
               ) : (
                 <>
-                  <BrainCircuit className="h-16 w-16 text-slate-400 mb-4 opacity-50" />
-                  <h3 className="text-xl font-bold text-slate-500 mb-2">
+                  <BrainCircuit className="h-16 w-16 text-[var(--color-civic-text-muted)] mb-4 opacity-50" />
+                  <h3 className="text-xl font-bold text-[var(--color-civic-text-secondary)] mb-2">
                     Waiting for AI Analysis
                   </h3>
-                  <p className="text-sm text-slate-500 max-w-sm">
+                  <p className="text-sm text-[var(--color-civic-text-muted)] font-medium max-w-sm">
                     Provide a photo and description, then click "Analyze with
                     AI" to generate a structured civic report.
                   </p>
                 </>
               )}
-            </NeumorphicCard>
+            </NeumorphicCardInset>
           ) : (
-            <NeumorphicCard className="p-6 space-y-6 animate-in fade-in zoom-in-95">
-              <div className="flex items-center justify-between border-b border-slate-200/50 pb-4">
+            <NeumorphicCard className="p-6 space-y-6 animate-in fade-in zoom-in-95 border-t-4 border-t-[var(--color-civic-admin)]">
+              <div className="flex items-center justify-between border-b border-[var(--color-civic-border)]/60 pb-4">
                 <div className="flex flex-col gap-1">
-                  <div className="flex items-center gap-2 text-blue-600 font-bold">
+                  <div className="flex items-center gap-2 text-[var(--color-civic-admin)] font-extrabold tracking-tight">
                     <CheckCircle2 className="h-5 w-5" />
                     AI Analysis Complete
                   </div>
                   {analysisResult.isFallback ? (
-                    <span className="text-xs text-amber-600 font-medium">
-                      AI fallback mode is active. Gemini response was unavailable, so demo-safe analysis was used.
+                    <span className="text-xs text-[var(--color-civic-priority-medium)] font-bold uppercase tracking-widest">
+                      AI fallback mode active
                     </span>
                   ) : (
-                    <span className="text-xs text-slate-500 font-medium">
-                      Analyzed by CivicVision AI using Gemini.
+                    <span className="text-xs text-[var(--color-civic-text-muted)] font-bold uppercase tracking-widest">
+                      Analyzed by CivicVision AI
                     </span>
                   )}
                 </div>
-                <div className="text-sm text-slate-500 flex items-center gap-2">
+                <div className="text-sm text-[var(--color-civic-text-secondary)] font-bold flex items-center gap-2 uppercase tracking-widest">
                   <span>Confidence:</span>
-                  <div className="w-24 h-2 bg-slate-200 rounded-full overflow-hidden shadow-inner">
+                  <div className="w-24 h-2 bg-[var(--color-civic-surface-inset)] rounded-full overflow-hidden shadow-[var(--shadow-neumorphic-inset)]">
                     <div 
-                      className={`h-full ${analysisResult.confidence >= 0.8 ? 'bg-green-500' : analysisResult.confidence >= 0.6 ? 'bg-amber-500' : 'bg-red-500'}`}
+                      className={`h-full ${analysisResult.confidence >= 0.8 ? 'bg-[var(--color-civic-status-confirmed)]' : analysisResult.confidence >= 0.6 ? 'bg-[var(--color-civic-priority-medium)]' : 'bg-[var(--color-civic-danger)]'}`}
                       style={{ width: `${Math.round(analysisResult.confidence * 100)}%` }}
                     />
                   </div>
-                  <span className="font-bold text-slate-800">
+                  <span className="font-black text-[var(--color-civic-text-primary)]">
                     {(analysisResult.confidence * 100).toFixed(0)}%
                   </span>
                 </div>
@@ -631,12 +632,12 @@ export function Report() {
 
               <div className="space-y-4">
                 <div>
-                  <h2 className="text-2xl font-bold text-slate-800 leading-tight mb-2">
+                  <h2 className="text-2xl font-extrabold text-[var(--color-civic-text-primary)] leading-tight mb-3">
                     {analysisResult.title}
                   </h2>
 
                   {analysisResult.confidence < 0.55 && !manualMode && (
-                    <div className="mb-4 bg-amber-50 border border-amber-200 text-amber-800 px-3 py-2 rounded-lg text-sm flex items-start gap-2">
+                    <div className="mb-4 bg-[var(--color-civic-priority-medium)]/10 border border-[var(--color-civic-priority-medium)]/30 text-[var(--color-civic-priority-medium)] px-3 py-2 rounded-lg text-sm font-bold flex items-start gap-2 shadow-sm">
                       <ShieldAlert className="h-4 w-4 mt-0.5 shrink-0" />
                       <p>
                         AI confidence is low. Please review and adjust the
@@ -647,7 +648,7 @@ export function Report() {
 
                   <div className="flex flex-wrap gap-2">
                     <select
-                      className="text-xs font-semibold px-3 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200 focus:outline-none appearance-none cursor-pointer"
+                      className="text-xs font-black uppercase tracking-widest px-3 py-1 rounded-full bg-[var(--color-civic-primary-soft)] text-[var(--color-civic-primary)] border border-transparent focus:outline-none appearance-none cursor-pointer shadow-sm"
                       value={analysisResult.category}
                       onChange={(e) =>
                         setAnalysisResult({
@@ -674,13 +675,13 @@ export function Report() {
                     </select>
 
                     <select
-                      className={`text-xs font-semibold px-3 py-1 rounded-full border focus:outline-none appearance-none cursor-pointer ${
+                      className={`text-xs font-black uppercase tracking-widest px-3 py-1 rounded-full border border-transparent focus:outline-none appearance-none cursor-pointer shadow-sm ${
                         analysisResult.severity === "Critical" ||
                         analysisResult.severity === "High"
-                          ? "bg-red-50 text-red-700 border-red-200"
+                          ? "bg-[var(--color-civic-danger)]/10 text-[var(--color-civic-danger)]"
                           : analysisResult.severity === "Medium"
-                            ? "bg-amber-50 text-amber-700 border-amber-200"
-                            : "bg-slate-100 text-slate-700 border-slate-200"
+                            ? "bg-[var(--color-civic-priority-medium)]/10 text-[var(--color-civic-priority-medium)]"
+                            : "bg-[var(--color-civic-surface-inset)] text-[var(--color-civic-text-secondary)] shadow-[var(--shadow-neumorphic-inset)]"
                       }`}
                       value={analysisResult.severity}
                       onChange={(e) =>
@@ -696,41 +697,41 @@ export function Report() {
                       <option value="Critical">Critical</option>
                     </select>
 
-                    <NeumorphicBadge variant="default">
+                    <NeumorphicBadge variant="department">
                       {analysisResult.suggestedDepartment}
                     </NeumorphicBadge>
                   </div>
                 </div>
 
-                <div className="bg-[#e9eef5] p-4 rounded-xl shadow-[inset_2px_2px_4px_#b8bec5,inset_-2px_-2px_4px_#ffffff]">
-                  <p className="text-sm text-slate-700 italic">
+                <NeumorphicCardInset className="p-4 rounded-xl border-transparent">
+                  <p className="text-sm font-medium text-[var(--color-civic-text-secondary)] italic">
                     "{analysisResult.citizenSummary}"
                   </p>
-                </div>
+                </NeumorphicCardInset>
 
-                <div className="space-y-2">
+                <div className="space-y-3">
                   <div className="flex justify-between text-sm">
-                    <span className="font-semibold text-slate-600">
+                    <span className="font-bold text-[var(--color-civic-text-muted)] uppercase tracking-widest">
                       Risk Reason:
                     </span>
-                    <span className="text-slate-800 text-right max-w-[60%]">
+                    <span className="text-[var(--color-civic-text-primary)] font-medium text-right max-w-[60%]">
                       {analysisResult.riskReason}
                     </span>
                   </div>
                   <div className="flex justify-between text-sm">
-                    <span className="font-semibold text-slate-600">
+                    <span className="font-bold text-[var(--color-civic-text-muted)] uppercase tracking-widest">
                       Recommended Action:
                     </span>
-                    <span className="text-slate-800 text-right max-w-[60%]">
+                    <span className="text-[var(--color-civic-text-primary)] font-medium text-right max-w-[60%]">
                       {analysisResult.recommendedAction}
                     </span>
                   </div>
                   <div className="flex justify-between text-sm">
-                    <span className="font-semibold text-slate-600">
+                    <span className="font-bold text-[var(--color-civic-text-muted)] uppercase tracking-widest">
                       Spam Risk:
                     </span>
                     <span
-                      className={`text-right ${analysisResult.spamRisk === "High" ? "text-red-600 font-bold" : "text-slate-800"}`}
+                      className={`text-right font-bold ${analysisResult.spamRisk === "High" ? "text-[var(--color-civic-danger)]" : "text-[var(--color-civic-text-primary)]"}`}
                     >
                       {analysisResult.spamRisk}
                     </span>
@@ -738,8 +739,8 @@ export function Report() {
                 </div>
 
                 {analysisResult.spamRisk === "High" && (
-                  <div className="bg-red-50 p-3 rounded-lg border border-red-200">
-                    <label className="flex items-start gap-2 text-sm text-red-800 cursor-pointer">
+                  <div className="bg-[var(--color-civic-danger)]/10 p-3 rounded-lg border border-[var(--color-civic-danger)]/30">
+                    <label className="flex items-start gap-2 text-sm text-[var(--color-civic-danger)] font-bold cursor-pointer">
                       <input
                         type="checkbox"
                         className="mt-1"
@@ -754,25 +755,25 @@ export function Report() {
                   </div>
                 )}
 
-                <div className="pt-4 border-t border-slate-200/50">
-                  <p className="text-xs text-slate-500 font-semibold mb-1 uppercase tracking-wider">
+                <div className="pt-4 border-t border-[var(--color-civic-border)]/60">
+                  <p className="text-xs text-[var(--color-civic-text-muted)] font-bold mb-1 uppercase tracking-widest">
                     Verification Question
                   </p>
-                  <p className="text-sm text-slate-800 font-medium">
+                  <p className="text-sm text-[var(--color-civic-text-primary)] font-bold">
                     {analysisResult.verificationQuestion}
                   </p>
                 </div>
 
-                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 rounded-xl border border-blue-100 flex items-center justify-between">
+                <div className="bg-gradient-to-r from-[var(--color-civic-primary-soft)] to-transparent p-4 rounded-xl border border-[var(--color-civic-primary)]/20 flex items-center justify-between">
                   <div className="space-y-1">
-                    <p className="text-xs font-bold uppercase tracking-wider text-blue-600">
+                    <p className="text-xs font-black uppercase tracking-widest text-[var(--color-civic-primary)]">
                       Priority Preview
                     </p>
-                    <p className="text-sm text-slate-700">
+                    <p className="text-sm font-medium text-[var(--color-civic-text-secondary)]">
                       Estimated initial impact score
                     </p>
                   </div>
-                  <div className="flex items-center justify-center w-12 h-12 rounded-full bg-white shadow-[2px_2px_4px_#b8bec5,-2px_-2px_4px_#ffffff] font-black text-blue-600 text-lg">
+                  <div className="flex items-center justify-center w-12 h-12 rounded-full bg-[var(--color-civic-surface)] shadow-[var(--shadow-neumorphic)] font-black text-[var(--color-civic-primary)] text-lg">
                     {
                       calculatePriorityScore({
                         severity: analysisResult.severity,
@@ -787,7 +788,7 @@ export function Report() {
                 </div>
 
                 <div className="pt-2">
-                  <p className="text-sm text-slate-500 italic mb-3">
+                  <p className="text-sm text-[var(--color-civic-text-muted)] font-medium italic mb-3">
                     Please review the details above before submitting.
                   </p>
                   <NeumorphicButton
@@ -821,25 +822,25 @@ export function Report() {
               className="w-full max-w-lg"
             >
               <NeumorphicCard className="p-6 sm:p-8 relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-32 h-32 bg-amber-100 rounded-full blur-3xl -mr-16 -mt-16 opacity-60 pointer-events-none"></div>
+                <div className="absolute top-0 right-0 w-32 h-32 bg-[var(--color-civic-priority-medium)] rounded-full blur-3xl -mr-16 -mt-16 opacity-30 pointer-events-none"></div>
 
                 <div className="flex items-center gap-3 mb-6 relative z-10">
-                  <div className="p-2.5 bg-amber-50 text-amber-600 rounded-full border border-amber-200">
+                  <div className="p-2.5 bg-[var(--color-civic-priority-medium)]/10 text-[var(--color-civic-priority-medium)] rounded-full border border-[var(--color-civic-priority-medium)]/20 shadow-sm">
                     <Copy className="h-6 w-6" />
                   </div>
                   <div>
-                    <h2 className="text-xl font-bold text-slate-800">
+                    <h2 className="text-xl font-extrabold text-[var(--color-civic-text-primary)]">
                       Possible duplicate found
                     </h2>
-                    <p className="text-sm text-slate-500">
+                    <p className="text-sm text-[var(--color-civic-text-secondary)] font-medium">
                       A similar issue already exists nearby.
                     </p>
                   </div>
                 </div>
 
-                <div className="bg-[#e9eef5] rounded-xl p-5 mb-6 shadow-[inset_2px_2px_4px_#b8bec5,inset_-2px_-2px_4px_#ffffff] relative z-10">
+                <NeumorphicCardInset className="rounded-xl p-5 mb-6 relative z-10 border-transparent">
                   <div className="flex justify-between items-start mb-3">
-                    <h3 className="font-bold text-slate-800 leading-tight">
+                    <h3 className="font-bold text-[var(--color-civic-text-primary)] leading-tight">
                       {duplicateCandidate.title}
                     </h3>
                     <NeumorphicBadge variant="info" className="shrink-0 ml-2">
@@ -847,44 +848,44 @@ export function Report() {
                     </NeumorphicBadge>
                   </div>
 
-                  <div className="space-y-2 text-sm text-slate-600">
+                  <div className="space-y-2 text-sm text-[var(--color-civic-text-secondary)] font-medium">
                     <div className="flex justify-between">
-                      <span className="font-medium">Status:</span>
-                      <span className="font-bold text-slate-800">
+                      <span className="font-bold text-[var(--color-civic-text-muted)] uppercase tracking-widest text-xs mt-0.5">Status:</span>
+                      <span className="font-bold text-[var(--color-civic-text-primary)]">
                         {duplicateCandidate.status}
                       </span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="font-medium">Location:</span>
+                      <span className="font-bold text-[var(--color-civic-text-muted)] uppercase tracking-widest text-xs mt-0.5">Location:</span>
                       <span
-                        className="text-slate-800 text-right max-w-[65%] truncate"
+                        className="text-[var(--color-civic-text-primary)] text-right max-w-[65%] truncate"
                         title={duplicateCandidate.address}
                       >
                         {duplicateCandidate.address}
                       </span>
                     </div>
-                    <div className="flex justify-between items-center pt-2 border-t border-slate-200/50 mt-2">
-                      <div className="flex items-center gap-1.5 text-blue-600">
+                    <div className="flex justify-between items-center pt-2 border-t border-[var(--color-civic-border)]/60 mt-2">
+                      <div className="flex items-center gap-1.5 text-[var(--color-civic-primary)]">
                         <CheckCircle2 className="h-4 w-4" />
                         <span className="font-bold">
                           {duplicateCandidate.verificationCount} verifications
                         </span>
                       </div>
                       <div className="flex items-center gap-1.5">
-                        <span className="font-medium text-slate-500 uppercase text-xs tracking-wider">
+                        <span className="font-black text-[var(--color-civic-text-muted)] uppercase text-xs tracking-widest">
                           Priority
                         </span>
                         <span
-                          className={`font-black ${duplicateCandidate.priorityScore >= 81 ? "text-red-500" : "text-amber-500"}`}
+                          className={`font-black ${duplicateCandidate.priorityScore >= 81 ? "text-[var(--color-civic-danger)]" : "text-[var(--color-civic-priority-medium)]"}`}
                         >
                           {duplicateCandidate.priorityScore}
                         </span>
                       </div>
                     </div>
                   </div>
-                </div>
+                </NeumorphicCardInset>
 
-                <p className="text-sm text-slate-600 mb-6 relative z-10">
+                <p className="text-sm text-[var(--color-civic-text-secondary)] font-medium mb-6 relative z-10">
                   You can verify the existing issue instead of creating a
                   duplicate report. This helps prioritize the problem faster!
                 </p>
@@ -899,8 +900,8 @@ export function Report() {
                     Verify existing issue
                   </NeumorphicButton>
                   <NeumorphicButton
-                    className="flex-1"
-                    variant="ghost"
+                    className="flex-1 font-bold"
+                    variant="secondary"
                     onClick={() => {
                       setDuplicateCandidate(null);
                       handleSubmit(true);

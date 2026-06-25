@@ -21,11 +21,15 @@ export interface User {
   id: string;
   name: string;
   email: string;
-  photoURL: string;
-  role: "Citizen" | "Admin";
+  photoURL?: string;
+  role: "citizen" | "department" | "admin";
+  departmentName?: string | null;
+  status?: "active" | "disabled";
   points: number;
   badges: string[];
   createdAt: number;
+  updatedAt?: number;
+  lastLoginAt?: number;
 }
 
 export interface Issue {

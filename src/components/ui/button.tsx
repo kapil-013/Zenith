@@ -2,7 +2,7 @@ import * as React from "react";
 import { cn } from "../../lib/utils";
 
 export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: "default" | "primary" | "danger" | "ghost" | "inset" | "success";
+  variant?: "default" | "primary" | "secondary" | "success" | "warning" | "danger" | "admin" | "department" | "ghost" | "inset";
   size?: "default" | "sm" | "lg" | "icon";
 }
 
@@ -12,7 +12,7 @@ const NeumorphicButton = React.forwardRef<HTMLButtonElement, ButtonProps>(
       <button
         ref={ref}
         className={cn(
-          "inline-flex items-center justify-center rounded-xl font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:opacity-50 disabled:pointer-events-none",
+          "inline-flex items-center justify-center rounded-xl font-semibold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-civic-primary)] disabled:opacity-50 disabled:pointer-events-none",
 
           // Sizes
           size === "default" && "h-11 px-6 py-2",
@@ -22,16 +22,25 @@ const NeumorphicButton = React.forwardRef<HTMLButtonElement, ButtonProps>(
 
           // Variants
           variant === "default" &&
-            "bg-[#e9eef5] text-slate-700 shadow-[4px_4px_8px_#b8bec5,-4px_-4px_8px_#ffffff] hover:shadow-[2px_2px_4px_#b8bec5,-2px_-2px_4px_#ffffff] active:shadow-[inset_2px_2px_5px_#b8bec5,inset_-2px_-2px_5px_#ffffff]",
+            "bg-[var(--color-civic-surface)] text-[var(--color-civic-text-primary)] shadow-[var(--shadow-neumorphic)] hover:translate-y-[-1px] hover:shadow-[var(--shadow-neumorphic-floating)] active:translate-y-[1px] active:shadow-[var(--shadow-neumorphic-inset)] border border-[var(--color-civic-border)]/50",
+          variant === "secondary" &&
+            "bg-[var(--color-civic-surface-inset)] text-[var(--color-civic-text-primary)] shadow-[var(--shadow-neumorphic-inset)] hover:bg-[var(--color-civic-surface)] hover:shadow-[var(--shadow-neumorphic)] border border-[var(--color-civic-border)]/50",
           variant === "primary" &&
-            "bg-blue-600 text-white shadow-[4px_4px_8px_#b8bec5,-4px_-4px_8px_#ffffff] hover:bg-blue-700 active:shadow-[inset_2px_2px_5px_rgba(0,0,0,0.2)]",
-          variant === "danger" &&
-            "bg-red-500 text-white shadow-[4px_4px_8px_#b8bec5,-4px_-4px_8px_#ffffff] hover:bg-red-600 active:shadow-[inset_2px_2px_5px_rgba(0,0,0,0.2)]",
+            "bg-[var(--color-civic-primary)] text-white shadow-[var(--shadow-neumorphic)] hover:bg-[var(--color-civic-primary-dark)] hover:shadow-[var(--shadow-neumorphic-floating)] active:shadow-[inset_2px_2px_5px_rgba(0,0,0,0.3)]",
           variant === "success" &&
-            "bg-green-600 text-white shadow-[4px_4px_8px_#b8bec5,-4px_-4px_8px_#ffffff] hover:bg-green-700 active:shadow-[inset_2px_2px_5px_rgba(0,0,0,0.2)]",
-          variant === "ghost" && "hover:bg-black/5 text-slate-700",
+            "bg-[var(--color-civic-status-confirmed)] text-white shadow-[var(--shadow-neumorphic)] hover:brightness-95 hover:shadow-[var(--shadow-neumorphic-floating)] active:shadow-[inset_2px_2px_5px_rgba(0,0,0,0.3)]",
+          variant === "warning" &&
+            "bg-[var(--color-civic-priority-medium)] text-white shadow-[var(--shadow-neumorphic)] hover:brightness-95 hover:shadow-[var(--shadow-neumorphic-floating)] active:shadow-[inset_2px_2px_5px_rgba(0,0,0,0.3)]",
+          variant === "danger" &&
+            "bg-[var(--color-civic-danger)] text-white shadow-[var(--shadow-neumorphic)] hover:brightness-95 hover:shadow-[var(--shadow-neumorphic-floating)] active:shadow-[inset_2px_2px_5px_rgba(0,0,0,0.3)]",
+          variant === "admin" &&
+            "bg-[var(--color-civic-admin)] text-white shadow-[var(--shadow-neumorphic)] hover:brightness-95 hover:shadow-[var(--shadow-neumorphic-floating)] active:shadow-[inset_2px_2px_5px_rgba(0,0,0,0.3)]",
+          variant === "department" &&
+            "bg-[var(--color-civic-department)] text-white shadow-[var(--shadow-neumorphic)] hover:brightness-95 hover:shadow-[var(--shadow-neumorphic-floating)] active:shadow-[inset_2px_2px_5px_rgba(0,0,0,0.3)]",
+          variant === "ghost" && 
+            "hover:bg-[var(--color-civic-surface-inset)] text-[var(--color-civic-text-primary)] hover:shadow-[var(--shadow-neumorphic-inset)] border border-transparent",
           variant === "inset" &&
-            "bg-[#e9eef5] text-slate-700 shadow-[inset_3px_3px_6px_#b8bec5,inset_-3px_-3px_6px_#ffffff]",
+            "bg-[var(--color-civic-surface-inset)] text-[var(--color-civic-text-primary)] shadow-[var(--shadow-neumorphic-inset)]",
 
           className,
         )}
