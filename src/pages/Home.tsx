@@ -1,5 +1,6 @@
 import React from "react";
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { NeumorphicCard, NeumorphicCardInset } from "../components/ui/card";
 import { NeumorphicButton } from "../components/ui/button";
 import {
@@ -16,6 +17,7 @@ import { NeumorphicBadge } from "../components/ui/badge";
 import { motion } from "motion/react";
 
 export function Home() {
+  const { t } = useTranslation();
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -32,7 +34,7 @@ export function Home() {
             transition={{ delay: 0.2 }}
           >
             <NeumorphicBadge variant="primary" className="mb-2 uppercase tracking-widest text-[10px]">
-              <SparklesIcon className="w-3 h-3 mr-1 inline" /> AI-powered civic accountability
+              <SparklesIcon className="w-3 h-3 mr-1 inline" /> {t("HomeHeroTag")}
             </NeumorphicBadge>
           </motion.div>
           <motion.h1
@@ -41,8 +43,8 @@ export function Home() {
             transition={{ delay: 0.3 }}
             className="text-4xl md:text-5xl lg:text-6xl font-extrabold text-[var(--color-civic-text-primary)] tracking-tight leading-tight"
           >
-            Turn local problems into{" "}
-            <span className="text-[var(--color-civic-primary)]">community action.</span>
+            {t("HomeHeadlinePart1")}{" "}
+            <span className="text-[var(--color-civic-primary)]">{t("HomeHeadlinePart2")}</span>
           </motion.h1>
           <motion.p
             initial={{ opacity: 0, y: 20 }}
@@ -50,7 +52,7 @@ export function Home() {
             transition={{ delay: 0.4 }}
             className="text-lg md:text-xl text-[var(--color-civic-text-secondary)] max-w-xl mx-auto lg:mx-0 leading-relaxed font-medium"
           >
-            Report issues with evidence, let Gemini prioritize them, and track transparent resolution with your community.
+            {t("HomeSubheadline")}
           </motion.p>
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -82,7 +84,7 @@ export function Home() {
                 className="gap-2 w-full sm:w-auto"
               >
                 <PlusCircle className="h-5 w-5" />
-                Report an Issue
+                {t("HomeCTA_Report")}
               </NeumorphicButton>
             </Link>
             <Link to="/issues">
@@ -92,7 +94,7 @@ export function Home() {
                 className="gap-2 w-full sm:w-auto"
               >
                 <MapIcon className="h-5 w-5 text-[var(--color-civic-primary)]" />
-                Explore Live Map
+                {t("HomeCTA_Explore")}
               </NeumorphicButton>
             </Link>
           </motion.div>

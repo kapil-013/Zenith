@@ -53,7 +53,8 @@ export function Issues() {
   }, []);
 
   const filteredIssues = issues.filter((issue) => {
-    if (filterStatus !== "All" && issue.status !== filterStatus) return false;
+    const status = issue.currentStatus || issue.status;
+    if (filterStatus !== "All" && status !== filterStatus) return false;
     if (filterCategory !== "All" && issue.category !== filterCategory) return false;
     if (filterSeverity !== "All" && issue.severity !== filterSeverity) return false;
     if (
@@ -120,11 +121,12 @@ export function Issues() {
               onChange={(e) => setFilterStatus(e.target.value)}
             >
               <option value="All">All Statuses</option>
-              <option value="Open">Open</option>
-              <option value="Verified">Verified</option>
-              <option value="In Progress">In Progress</option>
+              <option value="Reported">Reported</option>
+              <option value="Community Verified">Verified</option>
+              <option value="Assigned to Department">Assigned</option>
+              <option value="Work In Progress">In Progress</option>
               <option value="Resolved">Resolved</option>
-              <option value="Confirmed">Confirmed</option>
+              <option value="Closed">Closed</option>
             </select>
             <select
               className="flex h-11 w-full md:w-auto rounded-xl bg-[var(--color-civic-surface-inset)] px-4 py-2 text-sm font-bold text-[var(--color-civic-text-primary)] shadow-[var(--shadow-neumorphic-inset)] focus:outline-none focus:ring-2 focus:ring-[var(--color-civic-primary)]/50 shrink-0 border border-transparent appearance-none"
@@ -216,7 +218,7 @@ export function Issues() {
                       </p>
                       <div className="mt-2 flex gap-2">
                          <span className="text-xs px-2 py-1 bg-[var(--color-civic-surface-inset)] rounded-md text-[var(--color-civic-text-primary)] font-bold">
-                          {issue.status}
+                          {issue.currentStatus || issue.status}
                         </span>
                         <span className="text-xs px-2 py-1 bg-[var(--color-civic-surface-inset)] rounded-md text-[var(--color-civic-text-primary)] font-bold">
                           {issue.category}

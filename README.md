@@ -14,6 +14,17 @@ Community Hero solves this by:
 3. Automatically prioritizing issues based on calculated community impact.
 4. Providing transparent timelines and analytics for both citizens and authorities.
 
+## Demo Credentials
+Since the application uses Firebase Authentication for secure citizen and authority identities, we provide a complete suite of demo credentials that can be seeded automatically:
+
+1. **Seed Demo Accounts**: After initializing the project, run the seeding script:
+   ```bash
+   npm run seed:demo
+   ```
+   This will automatically create **11 demo accounts** (1 Super Admin, 1 Citizen, and 9 Department Officers for each unique city division) in both Firebase Auth and Firestore with the password `Demo@1234`.
+2. **Access Detailed Listing**: For the full table of emails and roles, along with an end-to-end walkthrough script, please refer to [DEMO_CREDENTIALS.md](./DEMO_CREDENTIALS.md).
+3. **Direct Demo Mode**: You can also toggle the interactive **Demo Mode** button in the header at any time to receive floating, real-time guidance directly inside the running application interface.
+
 ## Google Technologies & Tech Stack
 - **Gemini API (Server-side):** Uses `gemini-2.5-flash` for multimodal civic issue analysis and trend insight generation.
 - **Firebase Auth:** Google Sign-In for seamless citizen onboarding.
@@ -28,6 +39,8 @@ Community Hero solves this by:
 - **Dual Summarization:** Generates both a citizen-friendly summary and an action-oriented authority summary.
 - **Spam Prevention:** Detects discrepancies between images and descriptions to flag spam.
 - **Civic Insights:** AI processes the recent issue queue to summarize local trends, hotspots, and recommend actions for admins.
+- AI duplicate detection — before submitting, citizens are warned if a nearby open issue of the same category already exists, with a confidence score and option to verify the existing issue instead.
+- Predictive hotspot forecasting — admins can generate a CivicForecast showing which area/category patterns from the last 90 days are most likely to recur in the next 30 days, with risk levels and reasoning.
 
 ## Core Flows
 - **Citizen Flow:** Report an issue -> Analyze with AI -> Submit -> Earn Contribution Points -> Track Resolution.
@@ -35,12 +48,12 @@ Community Hero solves this by:
 - **Admin Flow:** View Dashboard -> Filter by Priority -> Assign Department -> Mark In Progress/Resolved.
 
 ## Demo Flow Guide (Hackathon)
-1. **Load Seed Data:** As an Admin, click "Load Demo Data" to populate the dashboard with realistic issues around Delhi NCR.
-2. **Report an Issue:** Click "Report Issue". Upload a photo (e.g., a pothole). Click "Analyze with AI". Watch Gemini classify the issue and generate summaries.
-3. **Submit & View:** Submit the report and view its detailed Priority Score calculation.
-4. **Community Action:** Sign in as another user (or verify your own for demo purposes) and click "Verify".
-5. **Admin Resolution:** Navigate to the Command Center (Admin). Enable Demo Admin if required. Click "Assign Dept", add a note, and change the status to "Resolved".
-6. **Impact Dashboard:** View the aggregated impact and AI-generated trends.
+1. **Submit & Analyze (Citizen):** Log in as `communityhero.citizen@demo.app` or register a new citizen. Click **Report an Issue**, upload a photo, and click **Analyze with AI** to see CivicVision AI run real-time duplicate detection, department routing, and calculate a Community Priority Score.
+2. **Request Role (Citizen):** Visit your **Profile**, click **Apply for Role**, choose **Sanitation Department**, fill out the brief form, and submit.
+3. **Approve Application (Super Admin):** Log in as `communityhero.superadmin@demo.app` (Super Admin). Go to the **Admin Dashboard** -> **Role Requests** and click **Approve** on the pending request.
+4. **Resolve Assigned Task (Department):** Log in as `communityhero.roadmaintenance@demo.app` or `communityhero.sanitation@demo.app`. Access the `/department` dashboard, select an assigned issue, post progress updates, and mark it as **Resolved**.
+5. **Confirm Resolution (Citizen):** Log back in as the Citizen, view the resolved issue, and click **Confirm Resolution** to close the feedback loop and receive civic contribution points on your **Profile**.
+6. **Analytics & Forecasts (Admin):** Log back in as Super Admin and view the `/impact` dashboard to check city-wide resolution statistics and generate a predictive AI hotspot forecast.
 
 ## Setup & Development
 
@@ -58,8 +71,8 @@ Note: Firebase configuration is injected via AI Studio Firebase integration.
 
 ## Future Scope
 - Integration with municipal APIs for automated ticketing.
-- Real-time notifications (SMS/Email) for status changes.
-- Multilingual support for broader citizen accessibility.
+- Video-based issue reporting with AI scene analysis.
+- Federated multi-city deployment with cross-city hotspot benchmarking.
 - Drone integration for AI-based city scanning.
 
 ## Deployment Health Check
@@ -70,8 +83,8 @@ Before final submission, confirm the deployed app is stable:
 - Confirm AI card says Gemini, not fallback.
 - Submit issue.
 - Verify issue.
-- Enable Demo Admin.
-- Assign department.
-- Change status.
-- Confirm resolution.
-- View Impact dashboard.
+- Request Department Role via Profile page.
+- Approve role request as Super Admin.
+- Log in as Department Officer to assign and change status.
+- Confirm resolution as Citizen.
+- View Impact dashboard and AI forecasts.

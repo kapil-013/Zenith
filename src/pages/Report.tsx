@@ -9,6 +9,7 @@ import { NeumorphicBadge } from "../components/ui/badge";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 import { db, storage } from "../lib/firebase";
+import { dispatcher } from "../lib/events/dispatcher";
 import {
   collection,
   addDoc,
@@ -29,7 +30,9 @@ import {
   Copy,
   Navigation,
   Search,
-  Sparkles
+  Sparkles,
+  CameraOff,
+  ExternalLink,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { calculatePriorityScore } from "../lib/utils";
@@ -82,6 +85,7 @@ export function Report() {
   const [spamConfirmed, setSpamConfirmed] = useState(false);
 
   const [duplicateCandidate, setDuplicateCandidate] = useState<any>(null);
+  const [aiDuplicates, setAiDuplicates] = useState<any[]>([]);
 
   const handleGetLocation = () => {
     setIsLocating(true);
@@ -252,6 +256,33 @@ export function Report() {
 
     if (!ignoreDuplicate) {
       setIsSubmitting(true);
+      try {
+        const checkLat = lat !== null ? lat : 28.6139;
+        const checkLng = lng !== null ? lng : 77.209;
+
+        const res = await fetch("/api/detect-duplicates", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            category: analysisResult.category,
+            lat: checkLat,
+            lng: checkLng,
+            description,
+          }),
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          if (data.duplicates && data.duplicates.length > 0) {
+            setAiDuplicates(data.duplicates);
+            setIsSubmitting(false);
+            return;
+          }
+        }
+      } catch (err) {
+        console.error("Proactive duplicate check failed:", err);
+      }
+
       const dup = await findDuplicate(
         analysisResult.category,
         address,
@@ -274,14 +305,16 @@ export function Report() {
         spamRisk: analysisResult.spamRisk,
         verificationCount: 0,
         duplicateCount: 0, // Since we ignored duplicate
-        status: "Open",
+        status: "Reported",
+        currentStatus: "Reported",
       };
 
       const { score, reasons } = calculatePriorityScore(initialIssueData);
 
       let finalLat = lat;
       let finalLng = lng;
-      let finalLocationStatus = locationStatus !== "none" ? locationStatus : "detected";
+      let finalLocationStatus =
+        locationStatus !== "none" ? locationStatus : "detected";
 
       if (finalLat === null || finalLng === null) {
         // Always use Delhi NCR fallback if location not detected, even if address is empty,
@@ -290,26 +323,41 @@ export function Report() {
         finalLng = 77.209;
         finalLocationStatus = address.trim() !== "" ? "manual" : "fallback";
       }
-      
+
       let uploadedImageUrl = "";
       if (image?.base64) {
         try {
-          const { ref, uploadString, getDownloadURL } = await import("firebase/storage");
-          const storageRef = ref(storage, `issues/${user.id}/${Date.now()}.jpg`);
+          const { ref, uploadString, getDownloadURL } =
+            await import("firebase/storage");
+          const storageRef = ref(
+            storage,
+            `issues/${user.id}/${Date.now()}.jpg`,
+          );
           // Note: image.base64 might contain data URL prefix, we need to handle that or upload the whole string
           // If it's a data_url:
-          const isDataUrl = image.base64.startsWith('data:');
-          const dataToUpload = isDataUrl ? image.base64 : `data:${image.mimeType};base64,${image.base64}`;
-          await uploadString(storageRef, dataToUpload, 'data_url');
+          const isDataUrl = image.base64.startsWith("data:");
+          const dataToUpload = isDataUrl
+            ? image.base64
+            : `data:${image.mimeType};base64,${image.base64}`;
+          await uploadString(storageRef, dataToUpload, "data_url");
           uploadedImageUrl = await getDownloadURL(storageRef);
         } catch (storageErr) {
-          console.error("Storage upload failed, falling back to base64", storageErr);
+          console.error(
+            "Storage upload failed, falling back to base64",
+            storageErr,
+          );
           // Check if base64 string is under a safe size for Firestore document (~800KB)
           if (image.base64.length < 800000) {
-            addToast("Image Storage fallback active. Using compressed preview for demo.", "info");
+            addToast(
+              "Image Storage fallback active. Using compressed preview for demo.",
+              "info",
+            );
             uploadedImageUrl = image.base64; // fallback
           } else {
-            addToast("Image too large and Storage failed. Please try a smaller image.", "error");
+            addToast(
+              "Image too large and Storage failed. Please try a smaller image.",
+              "error",
+            );
             setIsSubmitting(false);
             return;
           }
@@ -338,7 +386,8 @@ export function Report() {
         spamRisk: analysisResult.spamRisk,
         verificationQuestion: analysisResult.verificationQuestion,
         recommendedAction: analysisResult.recommendedAction,
-        status: "Open",
+        status: "Reported",
+        currentStatus: "Reported",
         priorityScore: score,
         priorityReasons: reasons,
         verificationCount: 0,
@@ -357,10 +406,26 @@ export function Report() {
       // Add initial status update
       await addDoc(collection(db, "status_updates"), {
         issueId: docRef.id,
-        status: "Open",
+        status: "Reported",
         note: "Issue reported by citizen.",
+        actorRole: user.role,
         updatedBy: user.id,
         createdAt: Date.now(),
+      });
+
+      await dispatcher.dispatch({
+        type: "IssueReported",
+        actorId: user.id,
+        actorRole: user.role,
+        affectedIssueId: docRef.id,
+        priority:
+          newIssue.priorityScore >= 81
+            ? "Urgent"
+            : newIssue.priorityScore >= 61
+              ? "High"
+              : newIssue.priorityScore >= 31
+                ? "Medium"
+                : "Low",
       });
 
       addToast("Issue reported successfully!", "success");
@@ -420,7 +485,9 @@ export function Report() {
       <div className="flex flex-col items-center justify-center min-h-[60vh]">
         <NeumorphicCard className="p-8 text-center max-w-md">
           <ShieldAlert className="h-12 w-12 text-[var(--color-civic-primary)] mx-auto mb-4" />
-          <h2 className="text-2xl font-bold mb-4 text-[var(--color-civic-text-primary)]">Sign In to Report</h2>
+          <h2 className="text-2xl font-bold mb-4 text-[var(--color-civic-text-primary)]">
+            Sign In to Report
+          </h2>
           <p className="text-[var(--color-civic-text-secondary)] font-medium mb-6">
             You need to be signed in to report a civic issue and earn
             contribution points.
@@ -443,7 +510,9 @@ export function Report() {
         <div className="p-3 bg-[var(--color-civic-surface-inset)] rounded-xl shadow-[var(--shadow-neumorphic-inset)] border border-transparent">
           <ShieldAlert className="h-6 w-6 text-[var(--color-civic-primary)]" />
         </div>
-        <h1 className="text-3xl font-extrabold text-[var(--color-civic-text-primary)] tracking-tight">Report an Issue</h1>
+        <h1 className="text-3xl font-extrabold text-[var(--color-civic-text-primary)] tracking-tight">
+          Report an Issue
+        </h1>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -567,7 +636,105 @@ export function Report() {
 
         {/* Right Column: AI Analysis & Submit */}
         <div className="space-y-6">
-          {!analysisResult ? (
+          {aiDuplicates.length > 0 ? (
+            <NeumorphicCard className="p-6 space-y-6 border-t-4 border-t-[var(--color-civic-priority-medium)] animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <div className="flex items-center gap-3 pb-4 border-b border-[var(--color-civic-border)]/60">
+                <div className="p-2.5 bg-[var(--color-civic-priority-medium)]/10 text-[var(--color-civic-priority-medium)] rounded-full border border-[var(--color-civic-priority-medium)]/20 shadow-sm">
+                  <Copy className="h-6 w-6" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-extrabold text-[var(--color-civic-text-primary)]">
+                    Potential Duplicate{aiDuplicates.length > 1 ? "s" : ""}{" "}
+                    Found
+                  </h2>
+                  <p className="text-sm text-[var(--color-civic-text-secondary)] font-medium">
+                    Our AI detected {aiDuplicates.length} similar unresolved
+                    issue{aiDuplicates.length > 1 ? "s" : ""} nearby.
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-4 max-h-[350px] overflow-y-auto pr-1">
+                {aiDuplicates.map((dup) => (
+                  <NeumorphicCardInset
+                    key={dup.id}
+                    className="p-4 rounded-xl border-transparent flex gap-4"
+                  >
+                    {dup.imageUrl ? (
+                      <img
+                        src={dup.imageUrl}
+                        alt={dup.title}
+                        className="w-20 h-20 rounded-lg object-cover bg-[var(--color-civic-surface-inset)] shadow-sm shrink-0"
+                      />
+                    ) : (
+                      <div className="w-20 h-20 rounded-lg bg-[var(--color-civic-surface-inset)] flex items-center justify-center text-[var(--color-civic-text-muted)] shrink-0 shadow-sm">
+                        <CameraOff className="h-6 w-6" />
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0 space-y-1">
+                      <div className="flex items-start justify-between gap-2">
+                        <h3
+                          className="font-extrabold text-sm text-[var(--color-civic-text-primary)] truncate"
+                          title={dup.title}
+                        >
+                          {dup.title}
+                        </h3>
+                        <span className="text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full bg-[var(--color-civic-surface)] text-[var(--color-civic-text-secondary)] shadow-sm border border-transparent shrink-0">
+                          {dup.status}
+                        </span>
+                      </div>
+                      <p className="text-xs text-[var(--color-civic-text-muted)] line-clamp-2">
+                        {dup.reasoning || dup.description}
+                      </p>
+                      <div className="pt-2 flex items-center justify-between">
+                        <a
+                          href={`/issues/${dup.id}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-xs font-bold text-[var(--color-civic-primary)] hover:underline flex items-center gap-1"
+                        >
+                          View this issue <ExternalLink className="h-3 w-3" />
+                        </a>
+                        <span className="text-xs font-bold text-amber-600">
+                          Match: {Math.round(dup.confidence * 100)}%
+                        </span>
+                      </div>
+                    </div>
+                  </NeumorphicCardInset>
+                ))}
+              </div>
+
+              <p className="text-sm text-[var(--color-civic-text-secondary)] font-medium">
+                To prevent duplicate reports, you can verify an existing issue
+                instead of creating a new report. This merges community efforts
+                and prioritizes resolving it faster!
+              </p>
+
+              <div className="flex flex-col gap-3 pt-2">
+                <div className="flex gap-3">
+                  <NeumorphicButton
+                    className="flex-1 font-bold text-sm"
+                    variant="primary"
+                    onClick={() => {
+                      navigate(`/issues/${aiDuplicates[0].id}`);
+                    }}
+                  >
+                    This is the same — verify it instead
+                  </NeumorphicButton>
+                  <NeumorphicButton
+                    className="flex-1 font-bold text-sm"
+                    variant="secondary"
+                    onClick={() => {
+                      setAiDuplicates([]);
+                      handleSubmit(true);
+                    }}
+                  >
+                    This is a different issue — submit anyway
+                  </NeumorphicButton>
+                </div>
+              </div>
+            </NeumorphicCard>
+          ) : !analysisResult ? (
             <NeumorphicCardInset
               className={`p-12 flex flex-col items-center justify-center text-center h-full min-h-[400px] border-dashed border-2 ${isAnalyzing ? "border-[var(--color-civic-admin)]" : "border-[var(--color-civic-border)] opacity-70"} transition-all`}
             >
@@ -619,9 +786,11 @@ export function Report() {
                 <div className="text-sm text-[var(--color-civic-text-secondary)] font-bold flex items-center gap-2 uppercase tracking-widest">
                   <span>Confidence:</span>
                   <div className="w-24 h-2 bg-[var(--color-civic-surface-inset)] rounded-full overflow-hidden shadow-[var(--shadow-neumorphic-inset)]">
-                    <div 
-                      className={`h-full ${analysisResult.confidence >= 0.8 ? 'bg-[var(--color-civic-status-confirmed)]' : analysisResult.confidence >= 0.6 ? 'bg-[var(--color-civic-priority-medium)]' : 'bg-[var(--color-civic-danger)]'}`}
-                      style={{ width: `${Math.round(analysisResult.confidence * 100)}%` }}
+                    <div
+                      className={`h-full ${analysisResult.confidence >= 0.8 ? "bg-[var(--color-civic-status-confirmed)]" : analysisResult.confidence >= 0.6 ? "bg-[var(--color-civic-priority-medium)]" : "bg-[var(--color-civic-danger)]"}`}
+                      style={{
+                        width: `${Math.round(analysisResult.confidence * 100)}%`,
+                      }}
                     />
                   </div>
                   <span className="font-black text-[var(--color-civic-text-primary)]">
@@ -781,7 +950,8 @@ export function Report() {
                         spamRisk: analysisResult.spamRisk,
                         verificationCount: 0,
                         duplicateCount: 0,
-                        status: "Open",
+                        status: "Reported",
+                        currentStatus: "Reported",
                       }).score
                     }
                   </div>
@@ -850,13 +1020,17 @@ export function Report() {
 
                   <div className="space-y-2 text-sm text-[var(--color-civic-text-secondary)] font-medium">
                     <div className="flex justify-between">
-                      <span className="font-bold text-[var(--color-civic-text-muted)] uppercase tracking-widest text-xs mt-0.5">Status:</span>
+                      <span className="font-bold text-[var(--color-civic-text-muted)] uppercase tracking-widest text-xs mt-0.5">
+                        Status:
+                      </span>
                       <span className="font-bold text-[var(--color-civic-text-primary)]">
                         {duplicateCandidate.status}
                       </span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="font-bold text-[var(--color-civic-text-muted)] uppercase tracking-widest text-xs mt-0.5">Location:</span>
+                      <span className="font-bold text-[var(--color-civic-text-muted)] uppercase tracking-widest text-xs mt-0.5">
+                        Location:
+                      </span>
                       <span
                         className="text-[var(--color-civic-text-primary)] text-right max-w-[65%] truncate"
                         title={duplicateCandidate.address}

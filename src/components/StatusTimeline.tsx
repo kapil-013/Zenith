@@ -8,6 +8,8 @@ interface StatusUpdate {
   id: string;
   status: string;
   note: string;
+  attachments?: string[];
+  actorRole?: string;
   updatedBy: string;
   createdAt: number;
 }
@@ -79,17 +81,33 @@ export function StatusTimeline({
               </div>
               <div className={`p-4 rounded-xl ${isLatest ? 'bg-[var(--color-civic-surface)] shadow-[var(--shadow-neumorphic)]' : 'bg-[var(--color-civic-surface-inset)] border border-transparent shadow-[var(--shadow-neumorphic-inset)]'}`}>
                 <div className="flex justify-between items-start mb-2">
-                  <span
-                    className={`text-sm font-black uppercase tracking-widest ${isLatest ? "text-[var(--color-civic-primary)]" : "text-[var(--color-civic-text-secondary)]"}`}
-                  >
-                    {update.status}
-                  </span>
-                  <span className="text-xs text-[var(--color-civic-text-muted)] flex items-center gap-1 font-bold bg-[var(--color-civic-surface)] shadow-sm px-2 py-1 rounded-md">
+                  <div className="flex flex-col">
+                    <span
+                      className={`text-sm font-black uppercase tracking-widest ${isLatest ? "text-[var(--color-civic-primary)]" : "text-[var(--color-civic-text-secondary)]"}`}
+                    >
+                      {update.status}
+                    </span>
+                    {update.actorRole && (
+                      <span className="text-[10px] font-bold text-[var(--color-civic-text-muted)] uppercase mt-0.5">
+                        by {update.actorRole}
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-xs text-[var(--color-civic-text-muted)] flex items-center gap-1 font-bold bg-[var(--color-civic-surface)] shadow-sm px-2 py-1 rounded-md shrink-0">
                     <Clock className="h-3 w-3" />
                     {formatDistanceToNow(update.createdAt, { addSuffix: true })}
                   </span>
                 </div>
-                <p className={`text-sm font-medium ${isLatest ? 'text-[var(--color-civic-text-primary)]' : 'text-[var(--color-civic-text-secondary)]'}`}>{update.note}</p>
+                {update.note && <p className={`text-sm font-medium mt-2 ${isLatest ? 'text-[var(--color-civic-text-primary)]' : 'text-[var(--color-civic-text-secondary)]'}`}>{update.note}</p>}
+                {update.attachments && update.attachments.length > 0 && (
+                  <div className="mt-3 flex gap-2 overflow-x-auto pb-2">
+                    {update.attachments.map((url, i) => (
+                      <a key={i} href={url} target="_blank" rel="noreferrer" className="shrink-0 block w-20 h-20 rounded-md overflow-hidden shadow-sm border border-[var(--color-civic-border)] hover:opacity-80 transition-opacity">
+                        <img src={url} alt="Evidence" className="w-full h-full object-cover" />
+                      </a>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           );

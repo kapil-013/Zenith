@@ -3,6 +3,7 @@ import { Navigate, Outlet } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { ShieldAlert } from "lucide-react";
 import { NeumorphicCard } from "./ui/card";
+import { hasPermission } from "../lib/auth/permissions";
 
 export function RequireAuth() {
   const { user, loading } = useAuth();
@@ -23,12 +24,12 @@ export function RequireAuth() {
   return <Outlet />;
 }
 
-export function RequireRole({ allowedRoles }: { allowedRoles: string[] }) {
+export function RequirePermission({ requiredPermission }: { requiredPermission: string }) {
   const { user, role, loading } = useAuth();
   
   if (loading) return null;
   
-  if (!user || !role || !allowedRoles.includes(role)) {
+  if (!user || !role || !hasPermission(role, requiredPermission as any)) {
     return (
       <div className="flex justify-center items-center h-[50vh]">
         <NeumorphicCard className="p-8 max-w-sm w-full text-center space-y-4">

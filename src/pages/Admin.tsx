@@ -17,13 +17,7 @@ import { NeumorphicButton } from "../components/ui/button";
 import { NeumorphicBadge } from "../components/ui/badge";
 import { NeumorphicInput } from "../components/ui/input";
 import { NeumorphicTextarea } from "../components/ui/textarea";
-import {
-  PieChart,
-  Pie,
-  Cell,
-  ResponsiveContainer,
-  Tooltip,
-} from "recharts";
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import {
   LayoutDashboard,
   CheckCircle2,
@@ -35,6 +29,8 @@ import {
 import { loadDemoData, resetDemoData } from "../lib/seed";
 import { motion, AnimatePresence } from "motion/react";
 import { AIInsightCard, InsightData } from "../components/AIInsightCard";
+import { AIBriefingWidget } from "../components/ui/intelligence/AIBriefingWidget";
+import { hasPermission, Permission } from "../lib/auth/permissions";
 
 export function Admin() {
   const { user, role } = useAuth();
@@ -42,7 +38,7 @@ export function Admin() {
   const [issues, setIssues] = useState<Issue[]>([]);
   const [insight, setInsight] = useState<InsightData | null>(null);
   const [loadingInsight, setLoadingInsight] = useState(false);
-  
+
   // Assign Dept Modal State
   const [assignModalOpen, setAssignModalOpen] = useState(false);
   const [selectedIssueId, setSelectedIssueId] = useState<string | null>(null);
@@ -60,7 +56,12 @@ export function Admin() {
   }, []);
 
   useEffect(() => {
-    if (issues.length > 0 && !insight && !loadingInsight && role === "admin") {
+    if (
+      issues.length > 0 &&
+      !insight &&
+      !loadingInsight &&
+      hasPermission(role, Permission.VIEW_ADMIN_DASHBOARD)
+    ) {
       generateInsight(issues);
     }
   }, [issues, role]);
@@ -103,7 +104,10 @@ export function Admin() {
       return;
     }
     try {
-      await updateDoc(doc(db, "issues", issueId), { status: newStatus, updatedAt: Date.now() });
+      await updateDoc(doc(db, "issues", issueId), {
+        status: newStatus,
+        updatedAt: Date.now(),
+      });
       await addDoc(collection(db, "status_updates"), {
         issueId,
         status: newStatus,
@@ -122,22 +126,22 @@ export function Admin() {
     if (!selectedIssueId || !assignDept.trim() || !user) return;
     try {
       const issueRef = doc(db, "issues", selectedIssueId);
-      const currentIssue = issues.find(i => i.id === selectedIssueId);
+      const currentIssue = issues.find((i) => i.id === selectedIssueId);
       if (!currentIssue) return;
-      
-      await updateDoc(issueRef, { 
+
+      await updateDoc(issueRef, {
         assignedTo: assignDept.trim(),
-        updatedAt: Date.now()
+        updatedAt: Date.now(),
       });
-      
+
       await addDoc(collection(db, "status_updates"), {
         issueId: selectedIssueId,
         status: currentIssue.status,
-        note: `Assigned to ${assignDept.trim()}.${assignNote ? ' Note: ' + assignNote : ''}`,
+        note: `Assigned to ${assignDept.trim()}.${assignNote ? " Note: " + assignNote : ""}`,
         updatedBy: user.id,
         createdAt: Date.now(),
       });
-      
+
       addToast("Department assigned successfully", "success");
       setAssignModalOpen(false);
       setAssignDept("");
@@ -172,34 +176,42 @@ export function Admin() {
       <div className="flex items-center justify-center min-h-[60vh]">
         <NeumorphicCard className="p-12 text-center flex flex-col items-center max-w-md w-full">
           <ShieldAlert className="h-16 w-16 text-slate-400 mb-6" />
-          <h2 className="text-2xl font-bold text-slate-800 mb-2">Sign in Required</h2>
-          <p className="text-slate-500 mb-8">Please sign in to access the command center.</p>
+          <h2 className="text-2xl font-bold text-slate-800 mb-2">
+            Sign in Required
+          </h2>
+          <p className="text-slate-500 mb-8">
+            Please sign in to access the command center.
+          </p>
         </NeumorphicCard>
       </div>
     );
   }
 
-  if (role !== "admin") {
+  if (!hasPermission(role, Permission.VIEW_ADMIN_DASHBOARD)) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <NeumorphicCard className="p-12 text-center flex flex-col items-center max-w-md w-full">
           <ShieldAlert className="h-16 w-16 text-red-400 mb-6" />
-          <h2 className="text-2xl font-bold text-slate-800 mb-2">Admin Access Required</h2>
-          <p className="text-slate-500">You do not have permission to view the command center.</p>
+          <h2 className="text-2xl font-bold text-slate-800 mb-2">
+            Admin Access Required
+          </h2>
+          <p className="text-slate-500">
+            You do not have permission to view the command center.
+          </p>
         </NeumorphicCard>
       </div>
     );
   }
 
   const total = issues.length;
-  const resolved = issues.filter(
-    (i) => i.status === "Resolved" || i.status === "Confirmed",
+  const resolvedStatuses = ["Resolved", "Confirmed", "Closed"];
+  const resolved = issues.filter((i) =>
+    resolvedStatuses.includes(i.status || i.currentStatus),
   ).length;
   const highPriority = issues.filter(
     (i) =>
       i.priorityScore >= 61 &&
-      i.status !== "Resolved" &&
-      i.status !== "Confirmed",
+      !resolvedStatuses.includes(i.status || i.currentStatus),
   ).length;
 
   const categoryCount = issues.reduce(
@@ -264,7 +276,9 @@ export function Admin() {
               <p className="text-sm font-bold text-[var(--color-civic-text-muted)] uppercase tracking-widest">
                 Total Reports
               </p>
-              <p className="text-4xl font-black text-[var(--color-civic-text-primary)] mt-2">{total}</p>
+              <p className="text-4xl font-black text-[var(--color-civic-text-primary)] mt-2">
+                {total}
+              </p>
             </div>
             <div className="p-4 bg-[var(--color-civic-primary)]/10 rounded-2xl text-[var(--color-civic-primary)] shadow-sm">
               <LayoutDashboard className="h-8 w-8" />
@@ -313,6 +327,17 @@ export function Admin() {
         </motion.div>
       </div>
 
+      <div className="mb-8">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.35 }}
+          className="h-96"
+        >
+          <AIBriefingWidget />
+        </motion.div>
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <motion.div
           initial={{ opacity: 0, x: -20 }}
@@ -350,7 +375,7 @@ export function Admin() {
                       boxShadow: "var(--shadow-neumorphic)",
                       backgroundColor: "var(--color-civic-surface)",
                       color: "var(--color-civic-text-primary)",
-                      fontWeight: "bold"
+                      fontWeight: "bold",
                     }}
                   />
                 </PieChart>
@@ -401,7 +426,9 @@ export function Admin() {
                     <h4 className="font-extrabold text-[var(--color-civic-text-primary)] text-lg">
                       {issue.title}
                     </h4>
-                    <p className="text-sm text-[var(--color-civic-text-secondary)] font-medium">{issue.address}</p>
+                    <p className="text-sm text-[var(--color-civic-text-secondary)] font-medium">
+                      {issue.address}
+                    </p>
                     <div className="flex flex-wrap gap-2 mt-2 items-center">
                       <NeumorphicBadge>{issue.category}</NeumorphicBadge>
                       <NeumorphicBadge
@@ -439,7 +466,9 @@ export function Admin() {
                     className="w-full"
                     onClick={() => {
                       setSelectedIssueId(issue.id);
-                      setAssignDept(issue.assignedTo || issue.suggestedDepartment || "");
+                      setAssignDept(
+                        issue.assignedTo || issue.suggestedDepartment || "",
+                      );
                       setAssignNote("");
                       setAssignModalOpen(true);
                     }}
@@ -451,7 +480,7 @@ export function Admin() {
             </motion.div>
           ))}
       </div>
-      
+
       {/* Assign Dept Modal */}
       <AnimatePresence>
         {assignModalOpen && (
@@ -474,8 +503,10 @@ export function Admin() {
                 >
                   <X className="h-5 w-5" />
                 </button>
-                <h3 className="text-xl font-extrabold text-[var(--color-civic-text-primary)] mb-6">Assign Department</h3>
-                
+                <h3 className="text-xl font-extrabold text-[var(--color-civic-text-primary)] mb-6">
+                  Assign Department
+                </h3>
+
                 <div className="space-y-4">
                   <div>
                     <label className="block text-sm font-bold text-[var(--color-civic-text-secondary)] mb-2 uppercase tracking-widest">
@@ -499,10 +530,18 @@ export function Admin() {
                     />
                   </div>
                   <div className="pt-4 flex gap-4">
-                    <NeumorphicButton className="flex-1" onClick={() => setAssignModalOpen(false)}>
+                    <NeumorphicButton
+                      className="flex-1"
+                      onClick={() => setAssignModalOpen(false)}
+                    >
                       Cancel
                     </NeumorphicButton>
-                    <NeumorphicButton variant="admin" className="flex-1" onClick={handleAssignDeptSubmit} disabled={!assignDept.trim()}>
+                    <NeumorphicButton
+                      variant="admin"
+                      className="flex-1"
+                      onClick={handleAssignDeptSubmit}
+                      disabled={!assignDept.trim()}
+                    >
                       Save Assignment
                     </NeumorphicButton>
                   </div>

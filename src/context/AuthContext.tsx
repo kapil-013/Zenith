@@ -10,13 +10,13 @@ import {
   onAuthStateChanged,
   User as FirebaseUser,
 } from "firebase/auth";
-import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
+import { doc, getDoc, updateDoc, onSnapshot } from "firebase/firestore";
 import { User } from "../types";
 
 interface AuthContextType {
   user: User | null;
   loading: boolean;
-  role: "citizen" | "department" | "admin" | null;
+  role: "citizen" | "department" | "admin" | "super_admin" | null;
   departmentName: string | null;
   signInWithGoogle: () => Promise<void>;
   loginWithEmailPassword: (e: string, p: string) => Promise<void>;
@@ -32,59 +32,64 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const fetchUserProfile = async (firebaseUser: FirebaseUser) => {
-    const userRef = doc(db, "users", firebaseUser.uid);
-    let userSnap = await getDoc(userRef);
-
-    if (!userSnap.exists()) {
-      // Synchronize with backend to safely bootstrap admin if needed
-      const token = await firebaseUser.getIdToken();
-      await fetch("/api/auth/sync-user", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          name: firebaseUser.displayName || "Citizen",
-          photoURL: firebaseUser.photoURL || "",
-        }),
-      });
-      userSnap = await getDoc(userRef);
-    } else {
-      // Update lastLoginAt
-      await updateDoc(userRef, {
-        lastLoginAt: Date.now(),
-        updatedAt: Date.now()
-      });
-      userSnap = await getDoc(userRef); // re-fetch after update
-    }
-
-    if (userSnap.exists()) {
-      const data = userSnap.data() as User;
-      setUser({ ...data, id: userSnap.id });
-    } else {
-      setUser(null);
-    }
-  };
-
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+    let unsubscribeSnapshot: (() => void) | undefined;
+
+    const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
-        await fetchUserProfile(firebaseUser);
+        const userRef = doc(db, "users", firebaseUser.uid);
+        let userSnap = await getDoc(userRef);
+
+        if (!userSnap.exists()) {
+          // Synchronize with backend to safely bootstrap admin if needed
+          const token = await firebaseUser.getIdToken();
+          await fetch("/api/auth/sync-user", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              name: firebaseUser.displayName || "Citizen",
+              photoURL: firebaseUser.photoURL || "",
+            }),
+          });
+        } else {
+          const updates: any = {
+            lastLoginAt: Date.now(),
+            updatedAt: Date.now()
+          };
+          await updateDoc(userRef, updates);
+        }
+
+        // Live listener
+        unsubscribeSnapshot = onSnapshot(userRef, (docSnap) => {
+          if (docSnap.exists()) {
+            setUser({ ...(docSnap.data() as User), id: docSnap.id });
+          } else {
+            setUser(null);
+          }
+          setLoading(false);
+        });
       } else {
         setUser(null);
+        setLoading(false);
+        if (unsubscribeSnapshot) {
+          unsubscribeSnapshot();
+        }
       }
-      setLoading(false);
     });
 
-    return () => unsubscribe();
+    return () => {
+      unsubscribeAuth();
+      if (unsubscribeSnapshot) {
+        unsubscribeSnapshot();
+      }
+    };
   }, []);
 
   const refreshUserProfile = async () => {
-    if (auth.currentUser) {
-      await fetchUserProfile(auth.currentUser);
-    }
+    // No-op for manual refresh, snapshot handles it.
   };
 
   const signInWithGoogle = async () => {
@@ -123,8 +128,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         photoURL: "",
       }),
     });
-    
-    await fetchUserProfile(cred.user);
   };
 
   const resetPassword = async (email: string) => {

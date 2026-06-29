@@ -19,6 +19,7 @@ import { NeumorphicCard } from "../components/ui/card";
 import { NeumorphicBadge } from "../components/ui/badge";
 import { NeumorphicButton } from "../components/ui/button";
 import { StatusTimeline } from "../components/StatusTimeline";
+import { AIExplainabilityWidget } from "../components/ui/intelligence/AIExplainabilityWidget";
 import {
   ShieldAlert,
   Users,
@@ -31,6 +32,9 @@ import {
 import { formatDistanceToNow } from "date-fns";
 import { cn, calculatePriorityScore } from "../lib/utils";
 import { motion } from "motion/react";
+import { dispatcher } from "../lib/events/dispatcher";
+import { WorkflowActionPanel } from "../components/WorkflowActionPanel";
+import { UserRole } from "../lib/auth/permissions";
 
 export function IssueDetail() {
   const { id } = useParams<{ id: string }>();
@@ -38,6 +42,7 @@ export function IssueDetail() {
   const { addToast } = useToast();
   const [issue, setIssue] = useState<Issue | null>(null);
   const [userActions, setUserActions] = useState<Verification[]>([]);
+  const [allVerifications, setAllVerifications] = useState<Verification[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -49,6 +54,13 @@ export function IssueDetail() {
         setIssue({ id: docSnap.id, ...docSnap.data() } as Issue);
       }
 
+      const allQ = query(
+        collection(db, "verifications"),
+        where("issueId", "==", id),
+      );
+      const allSnap = await getDocs(allQ);
+      setAllVerifications(allSnap.docs.map((d) => d.data() as Verification));
+
       if (user) {
         const q = query(
           collection(db, "verifications"),
@@ -57,10 +69,13 @@ export function IssueDetail() {
         );
         const verifSnap = await getDocs(q);
         if (!verifSnap.empty) {
-          const actions = verifSnap.docs.map(d => ({
-            id: d.id,
-            ...d.data(),
-          } as Verification));
+          const actions = verifSnap.docs.map(
+            (d) =>
+              ({
+                id: d.id,
+                ...d.data(),
+              }) as Verification,
+          );
           setUserActions(actions);
         }
       }
@@ -68,6 +83,75 @@ export function IssueDetail() {
     }
     fetchIssue();
   }, [id, user]);
+
+  const handleTransition = async (
+    nextStatus: string,
+    note: string,
+    attachments: string[],
+  ) => {
+    if (!user || !issue) return;
+    setLoading(true);
+    try {
+      const issueRef = doc(db, "issues", issue.id);
+
+      const updates: any = {
+        status: nextStatus,
+        currentStatus: nextStatus,
+      };
+
+      if (nextStatus === "Assigned to Department") {
+        updates.assignedBy = user.id;
+        updates.assignedAt = Date.now();
+      } else if (nextStatus === "Work Completed") {
+        updates.completedAt = Date.now();
+      } else if (nextStatus === "Closed" || nextStatus === "Resolved") {
+        updates.closedAt = Date.now();
+      }
+
+      await updateDoc(issueRef, updates);
+
+      await addDoc(collection(db, "status_updates"), {
+        issueId: issue.id,
+        status: nextStatus,
+        note: note,
+        attachments: attachments,
+        actorRole: user.role,
+        updatedBy: user.id,
+        createdAt: Date.now(),
+      });
+
+      await dispatcher.dispatch({
+        type: "IssueStatusChanged",
+        actorId: user.id,
+        actorRole: user.role,
+        affectedIssueId: issue.id,
+        affectedUsers: [issue.createdBy],
+        metadata: { newStatus: nextStatus },
+      });
+
+      if (nextStatus === "Assigned to Department") {
+        await dispatcher.dispatch({
+          type: "IssueAssigned",
+          actorId: user.id,
+          actorRole: user.role,
+          affectedIssueId: issue.id,
+          affectedUsers: [issue.createdBy],
+          departmentId:
+            issue.assignedTo ||
+            issue.suggestedDepartment ||
+            "General Civic Helpdesk",
+        });
+      }
+
+      addToast("Status updated successfully", "success");
+      setIssue((prev) => (prev ? { ...prev, ...updates } : prev));
+    } catch (e) {
+      console.error(e);
+      addToast("Failed to update status", "error");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleAction = async (
     type: "verify" | "dispute" | "confirm_resolved",
@@ -91,49 +175,79 @@ export function IssueDetail() {
       });
 
       const issueRef = doc(db, "issues", issue.id);
+      const userRef = doc(db, "users", user.id);
 
       if (type === "verify") {
+        const nextStatus =
+          issue.currentStatus === "Reported" || issue.status === "Open"
+            ? "Community Verified"
+            : issue.currentStatus || issue.status;
         const { score, reasons } = calculatePriorityScore({
           ...issue,
           verificationCount: (issue.verificationCount || 0) + 1,
-          status: issue.status === "Open" ? "Verified" : issue.status,
+          status: nextStatus,
         });
 
         await updateDoc(issueRef, {
           verificationCount: increment(1),
-          status: issue.status === "Open" ? "Verified" : issue.status,
+          status: nextStatus,
+          currentStatus: nextStatus,
           priorityScore: score,
           priorityReasons: reasons,
         });
 
+        await updateDoc(userRef, { points: increment(3) });
+
         // Status update for verified
-        if (issue.status === "Open") {
+        if (issue.currentStatus === "Reported" || issue.status === "Open") {
           await addDoc(collection(db, "status_updates"), {
             issueId: issue.id,
-            status: "Verified",
+            status: "Community Verified",
             note: "Issue verified by community member.",
+            actorRole: user.role,
             updatedBy: user.id,
             createdAt: Date.now(),
           });
         }
+
+        await dispatcher.dispatch({
+          type: "IssueVerified",
+          actorId: user.id,
+          actorRole: user.role,
+          affectedIssueId: issue.id,
+          affectedUsers: [issue.createdBy],
+        });
       } else if (type === "dispute") {
         await updateDoc(issueRef, { disputeCount: increment(1) });
       } else if (type === "confirm_resolved") {
         await updateDoc(issueRef, {
           confirmedResolvedCount: increment(1),
-          status: "Confirmed",
+          status: "Closed",
+          currentStatus: "Closed",
+          closedAt: Date.now(),
         });
+        await updateDoc(userRef, { points: increment(10) });
         await addDoc(collection(db, "status_updates"), {
           issueId: issue.id,
-          status: "Confirmed",
-          note: "Resolution confirmed by community member.",
+          status: "Closed",
+          note: "Resolution confirmed by community member. Case Closed.",
+          actorRole: user.role,
           updatedBy: user.id,
           createdAt: Date.now(),
+        });
+
+        await dispatcher.dispatch({
+          type: "CitizenConfirmedResolution",
+          actorId: user.id,
+          actorRole: user.role,
+          affectedIssueId: issue.id,
+          affectedUsers: [issue.createdBy],
+          departmentId: issue.assignedTo || undefined,
         });
       }
 
       addToast("Thank you for your civic contribution!", "success");
-      
+
       const newAction: Verification = {
         id: Math.random().toString(),
         issueId: issue.id,
@@ -141,26 +255,33 @@ export function IssueDetail() {
         type,
         createdAt: Date.now(),
       };
-      setUserActions(prev => [...prev, newAction]);
-      
-      setIssue(prev => {
+      setUserActions((prev) => [...prev, newAction]);
+
+      setIssue((prev) => {
         if (!prev) return prev;
         const newIssue = { ...prev };
         if (type === "verify") {
+          const nextStatus =
+            newIssue.currentStatus === "Reported" || newIssue.status === "Open"
+              ? "Community Verified"
+              : newIssue.currentStatus || newIssue.status;
           const { score, reasons } = calculatePriorityScore({
             ...newIssue,
             verificationCount: (newIssue.verificationCount || 0) + 1,
-            status: newIssue.status === "Open" ? "Verified" : newIssue.status,
+            status: nextStatus,
           });
           newIssue.verificationCount = (newIssue.verificationCount || 0) + 1;
-          newIssue.status = newIssue.status === "Open" ? "Verified" : newIssue.status;
+          newIssue.status = nextStatus;
+          newIssue.currentStatus = nextStatus;
           newIssue.priorityScore = score;
           newIssue.priorityReasons = reasons;
         } else if (type === "dispute") {
           newIssue.disputeCount = (newIssue.disputeCount || 0) + 1;
         } else if (type === "confirm_resolved") {
-          newIssue.confirmedResolvedCount = (newIssue.confirmedResolvedCount || 0) + 1;
-          newIssue.status = "Confirmed";
+          newIssue.confirmedResolvedCount =
+            (newIssue.confirmedResolvedCount || 0) + 1;
+          newIssue.status = "Closed";
+          newIssue.currentStatus = "Closed";
         }
         return newIssue;
       });
@@ -245,16 +366,29 @@ export function IssueDetail() {
                 </NeumorphicBadge>
                 <NeumorphicBadge
                   variant={
-                    issue.status === "Resolved" || issue.status === "Confirmed"
+                    ["Resolved", "Confirmed", "Closed"].includes(
+                      issue.currentStatus || issue.status,
+                    )
                       ? "success"
-                      : issue.status === "In Progress"
+                      : [
+                            "In Progress",
+                            "Work Started",
+                            "Work In Progress",
+                            "Inspection Scheduled",
+                            "Inspection Completed",
+                            "Temporary Fix Applied",
+                          ].includes(issue.currentStatus || issue.status)
                         ? "info"
-                        : issue.status === "Verified"
+                        : [
+                              "Verified",
+                              "Community Verified",
+                              "Waiting for Citizen Confirmation",
+                            ].includes(issue.currentStatus || issue.status)
                           ? "warning"
                           : "default"
                   }
                 >
-                  Status: {issue.status}
+                  Status: {issue.currentStatus || issue.status}
                 </NeumorphicBadge>
               </div>
 
@@ -267,22 +401,36 @@ export function IssueDetail() {
                   <MapPin className="h-4 w-4 shrink-0 text-[var(--color-civic-primary)]" />
                   <span className="font-bold">{issue.address}</span>
                 </div>
-                <div className="hidden sm:block text-[var(--color-civic-text-muted)]">|</div>
+                <div className="hidden sm:block text-[var(--color-civic-text-muted)]">
+                  |
+                </div>
                 <div className="flex items-center gap-2">
                   <Building className="h-4 w-4 shrink-0 text-[var(--color-civic-text-muted)]" />
                   <span className="capitalize">{issue.locationType}</span>
                 </div>
               </div>
 
-              {issue.status === "Verified" || issue.status === "In Progress" ? (
+              {[
+                "Verified",
+                "Community Verified",
+                "Assigned to Department",
+                "In Progress",
+                "Work Started",
+                "Work In Progress",
+                "Inspection Scheduled",
+                "Inspection Completed",
+                "Temporary Fix Applied",
+              ].includes(issue.currentStatus || issue.status) ? (
                 <div className="bg-[var(--color-civic-primary)]/10 border border-[var(--color-civic-primary)]/20 text-[var(--color-civic-primary)] px-4 py-3 rounded-lg text-sm font-bold flex items-center gap-2 shadow-sm">
-                  <Users className="h-5 w-5" />
+                  <Users className="h-5 w-5 shrink-0" />
                   This issue is community verified and pending authority
                   resolution.
                 </div>
-              ) : issue.status === "Confirmed" ? (
+              ) : ["Confirmed", "Closed"].includes(
+                  issue.currentStatus || issue.status,
+                ) ? (
                 <div className="bg-[var(--color-civic-status-confirmed)]/10 border border-[var(--color-civic-status-confirmed)]/20 text-[var(--color-civic-status-confirmed)] px-4 py-3 rounded-lg text-sm font-bold flex items-center gap-2 shadow-sm">
-                  <CheckCircle2 className="h-5 w-5" />
+                  <CheckCircle2 className="h-5 w-5 shrink-0" />
                   Confirmed fixed by residents. Civic impact achieved!
                 </div>
               ) : null}
@@ -336,9 +484,18 @@ export function IssueDetail() {
               <div className="border-t border-slate-200/50 pt-6">
                 <StatusTimeline
                   issueId={issue.id}
-                  currentStatus={issue.status}
+                  currentStatus={issue.currentStatus || issue.status}
                 />
               </div>
+
+              {user && (
+                <WorkflowActionPanel
+                  issueId={issue.id}
+                  currentStatus={issue.currentStatus || issue.status}
+                  onTransition={handleTransition}
+                  loading={loading}
+                />
+              )}
             </div>
           </NeumorphicCard>
         </motion.div>
@@ -381,6 +538,11 @@ export function IssueDetail() {
                 </div>
               ))}
             </div>
+
+            <AIExplainabilityWidget
+              issue={issue}
+              verifications={allVerifications}
+            />
           </NeumorphicCard>
 
           <NeumorphicCard className="p-6 relative overflow-hidden border-t-4 border-[var(--color-civic-primary)]">
@@ -417,7 +579,7 @@ export function IssueDetail() {
             </div>
 
             <div className="flex flex-col gap-3">
-              {userActions.some(a => a.type === "verify") && (
+              {userActions.some((a) => a.type === "verify") && (
                 <NeumorphicBadge
                   variant="success"
                   className="w-full justify-center py-2.5 text-sm font-bold"
@@ -425,7 +587,7 @@ export function IssueDetail() {
                   You verified this issue.
                 </NeumorphicBadge>
               )}
-              {userActions.some(a => a.type === "dispute") && (
+              {userActions.some((a) => a.type === "dispute") && (
                 <NeumorphicBadge
                   variant="danger"
                   className="w-full justify-center py-2.5 text-sm font-bold"
@@ -433,7 +595,7 @@ export function IssueDetail() {
                   You disputed this issue.
                 </NeumorphicBadge>
               )}
-              {userActions.some(a => a.type === "confirm_resolved") && (
+              {userActions.some((a) => a.type === "confirm_resolved") && (
                 <NeumorphicBadge
                   variant="success"
                   className="w-full justify-center py-2.5 text-sm font-bold"
@@ -442,7 +604,9 @@ export function IssueDetail() {
                 </NeumorphicBadge>
               )}
 
-              {!userActions.some(a => a.type === "verify" || a.type === "dispute") && (
+              {!userActions.some(
+                (a) => a.type === "verify" || a.type === "dispute",
+              ) && (
                 <>
                   <NeumorphicButton
                     className="w-full font-bold hover:-translate-y-0.5 transition-transform"
@@ -461,15 +625,18 @@ export function IssueDetail() {
                 </>
               )}
 
-              {issue.status === "Resolved" && !userActions.some(a => a.type === "confirm_resolved") && (
-                <NeumorphicButton
-                  className="w-full mt-4 font-bold animate-pulse hover:animate-none"
-                  variant="success"
-                  onClick={() => handleAction("confirm_resolved")}
-                >
-                  Confirm Actually Fixed (+10 pts)
-                </NeumorphicButton>
-              )}
+              {["Resolved", "Waiting for Citizen Confirmation"].includes(
+                issue.currentStatus || issue.status,
+              ) &&
+                !userActions.some((a) => a.type === "confirm_resolved") && (
+                  <NeumorphicButton
+                    className="w-full mt-4 font-bold animate-pulse hover:animate-none"
+                    variant="success"
+                    onClick={() => handleAction("confirm_resolved")}
+                  >
+                    Confirm Actually Fixed (+10 pts)
+                  </NeumorphicButton>
+                )}
             </div>
           </NeumorphicCard>
         </motion.div>

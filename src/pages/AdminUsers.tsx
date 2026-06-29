@@ -6,6 +6,7 @@ import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 import { Users, Plus, ShieldBan } from "lucide-react";
 import { auth } from "../lib/firebase";
+import { isAdminOrSuperAdmin, hasPermission, Permission, isSuperAdmin, isDepartment, UserRole } from "../lib/auth/permissions";
 
 export function AdminUsers() {
   const [users, setUsers] = useState<any[]>([]);
@@ -52,7 +53,7 @@ export function AdminUsers() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
       
-      addToast(newUser.role === "department" ? "Department account created. Share these credentials securely." : "Admin account created.", "success");
+      addToast(newUser.role === UserRole.DEPARTMENT ? "Department account created. Share these credentials securely." : "Admin account created.", "success");
       setShowModal(false);
       setNewUser({ name: "", email: "", password: "", role: "department", departmentName: "" });
       fetchUsers();
@@ -118,8 +119,8 @@ export function AdminUsers() {
                   </td>
                   <td className="p-4 capitalize">
                     <span className={`inline-flex px-2 py-1 rounded-md text-xs font-bold ${
-                      u.role === 'admin' ? 'bg-[var(--color-civic-admin)]/10 text-[var(--color-civic-admin)] shadow-sm border border-[var(--color-civic-admin)]/20' :
-                      u.role === 'department' ? 'bg-[var(--color-civic-department)]/10 text-[var(--color-civic-department)] shadow-sm border border-[var(--color-civic-department)]/20' :
+                      isAdminOrSuperAdmin(u.role) ? 'bg-[var(--color-civic-admin)]/10 text-[var(--color-civic-admin)] shadow-sm border border-[var(--color-civic-admin)]/20' :
+                      isDepartment(u.role) ? 'bg-[var(--color-civic-department)]/10 text-[var(--color-civic-department)] shadow-sm border border-[var(--color-civic-department)]/20' :
                       'bg-[var(--color-civic-surface-inset)] text-[var(--color-civic-text-secondary)] shadow-sm border border-transparent'
                     }`}>
                       {u.role}
@@ -134,7 +135,7 @@ export function AdminUsers() {
                     </span>
                   </td>
                   <td className="p-4">
-                    {u.id !== user?.id && (
+                    {u.id !== user?.id && (!isAdminOrSuperAdmin(u.role) || isSuperAdmin(user?.role)) && (
                       <NeumorphicButton
                         size="sm"
                         variant={u.status === 'disabled' ? "primary" : "danger"}
@@ -193,10 +194,10 @@ export function AdminUsers() {
                   onChange={e => setNewUser({...newUser, role: e.target.value})}
                 >
                   <option value="department">Department</option>
-                  <option value="admin">Admin</option>
+                  {hasPermission(user?.role, Permission.MANAGE_ADMINS) && <option value="admin">Admin</option>}
                 </select>
               </div>
-              {newUser.role === "department" && (
+              {newUser.role === UserRole.DEPARTMENT && (
                 <div>
                   <label className="block text-sm font-bold text-[var(--color-civic-text-secondary)] mb-1">Department</label>
                   <select

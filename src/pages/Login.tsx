@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 import { NeumorphicCard } from "../components/ui/card";
@@ -8,6 +9,7 @@ import { NeumorphicButton } from "../components/ui/button";
 import { LogIn, Eye, EyeOff } from "lucide-react";
 
 export function Login() {
+  const { t } = useTranslation();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -47,14 +49,14 @@ export function Login() {
           <div className="inline-flex p-3 bg-[var(--color-civic-surface-inset)] rounded-2xl shadow-[var(--shadow-neumorphic-inset)] border border-transparent mb-4">
             <LogIn className="h-8 w-8 text-[var(--color-civic-primary)]" />
           </div>
-          <h1 className="text-2xl font-bold text-[var(--color-civic-text-primary)]">Welcome Back</h1>
-          <p className="text-[var(--color-civic-text-secondary)] font-medium text-sm mt-2">Sign in to your account</p>
+          <h1 className="text-2xl font-bold text-[var(--color-civic-text-primary)]">{t("Login_Title")}</h1>
+          <p className="text-[var(--color-civic-text-secondary)] font-medium text-sm mt-2">{t("Login_Sub")}</p>
         </div>
 
         <form onSubmit={handleLogin} className="space-y-6">
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-bold text-[var(--color-civic-text-primary)] mb-2 uppercase tracking-widest">Email</label>
+              <label className="block text-sm font-bold text-[var(--color-civic-text-primary)] mb-2 uppercase tracking-widest">{t("Login_Email")}</label>
               <NeumorphicInput
                 type="email"
                 value={email}
@@ -64,7 +66,7 @@ export function Login() {
               />
             </div>
             <div>
-              <label className="block text-sm font-bold text-[var(--color-civic-text-primary)] mb-2 uppercase tracking-widest">Password</label>
+              <label className="block text-sm font-bold text-[var(--color-civic-text-primary)] mb-2 uppercase tracking-widest">{t("Login_Password")}</label>
               <div className="relative">
                 <NeumorphicInput
                   type={showPassword ? "text" : "password"}
@@ -86,18 +88,18 @@ export function Login() {
 
           <div className="flex items-center justify-end">
             <Link to="/forgot-password" className="text-sm font-bold text-[var(--color-civic-primary)] hover:underline">
-              Forgot password?
+              {t("Login_Forgot")}
             </Link>
           </div>
 
           <NeumorphicButton type="submit" className="w-full justify-center" variant="primary" disabled={loading}>
-            {loading ? "Signing in..." : "Sign In"}
+            {loading ? t("Login_ButtonLoading") : t("Login_Button")}
           </NeumorphicButton>
         </form>
 
         <div className="mt-6 flex items-center justify-center gap-2">
           <div className="h-px bg-[var(--color-civic-border)] flex-1" />
-          <span className="text-xs font-bold text-[var(--color-civic-text-muted)] uppercase tracking-widest">or continue with</span>
+          <span className="text-xs font-bold text-[var(--color-civic-text-muted)] uppercase tracking-widest">{t("Login_Or")}</span>
           <div className="h-px bg-[var(--color-civic-border)] flex-1" />
         </div>
 
@@ -110,14 +112,14 @@ export function Login() {
               <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
               <path d="M1 1h22v22H1z" fill="none"/>
             </svg>
-            Google Sign-In
+            {t("Login_Google")}
           </NeumorphicButton>
         </div>
 
         <div className="mt-8 text-center text-sm text-[var(--color-civic-text-secondary)] font-medium">
-          Don't have an account?{" "}
+          {t("Login_NoAccount")}{" "}
           <Link to="/register" className="text-[var(--color-civic-primary)] font-bold hover:underline">
-            Register here
+            {t("Login_Register")}
           </Link>
         </div>
       </NeumorphicCard>
