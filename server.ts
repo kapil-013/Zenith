@@ -994,6 +994,40 @@ Behavior rules:
     }
   });
 
+  app.post("/api/suggest-update", async (req, res) => {
+    try {
+      const { issueTitle, category, currentStatus, departmentName } = req.body;
+      
+      const systemInstruction = "You are a civic department assistant. Generate a brief, professional progress update note (2 sentences max) that a government department officer would write when updating the status of a civic issue. Be specific, action-oriented, and reassuring to citizens. Do not use jargon. Do not mention AI.";
+      const prompt = `Issue: ${issueTitle || "Civic Issue"}. Category: ${category || "General"}. Current status: ${currentStatus || "Open"}. Department: ${departmentName || "General Department"}. Write a progress update note.`;
+
+      let response;
+      try {
+        response = await ai.models.generateContent({
+          model: "gemini-2.5-flash",
+          contents: prompt,
+          config: {
+            systemInstruction,
+          },
+        });
+      } catch (err) {
+        console.warn("gemini-2.5-flash failed for suggest-update, falling back to gemini-2.5-flash-lite...");
+        response = await ai.models.generateContent({
+          model: "gemini-2.5-flash-lite",
+          contents: prompt,
+          config: {
+            systemInstruction,
+          },
+        });
+      }
+
+      const suggestion = response.text ? response.text.trim() : "";
+      res.json({ suggestion });
+    } catch (error) {
+      console.error("Error in /api/suggest-update:", error);
+      res.json({ suggestion: "" });
+    }
+  });
   app.post("/api/detect-duplicates", async (req, res) => {
     try {
       const { category, lat, lng, description } = req.body;

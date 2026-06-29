@@ -3,24 +3,66 @@ import { UserRole } from "../lib/auth/permissions";
 import { getAllowedTransitions, WorkflowTransitionRule } from "../lib/workflow/config";
 import { NeumorphicCard } from "./ui/card";
 import { NeumorphicButton } from "./ui/button";
-import { Activity, Camera, Upload, AlertCircle } from "lucide-react";
+import { Activity, Camera, Upload, AlertCircle, Sparkles } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
+import { useToast } from "../context/ToastContext";
 import { IssueStatus } from "../types";
 
 interface WorkflowActionPanelProps {
   issueId: string;
+  issueTitle?: string;
+  category?: string;
   currentStatus: IssueStatus;
   onTransition: (nextStatus: string, note: string, attachments: string[]) => Promise<void>;
   loading: boolean;
 }
 
-export function WorkflowActionPanel({ issueId, currentStatus, onTransition, loading }: WorkflowActionPanelProps) {
-  const { role } = useAuth();
+export function WorkflowActionPanel({
+  issueId,
+  issueTitle,
+  category,
+  currentStatus,
+  onTransition,
+  loading,
+}: WorkflowActionPanelProps) {
+  const { role, departmentName } = useAuth();
+  const { addToast } = useToast();
   const [selectedTransition, setSelectedTransition] = useState<WorkflowTransitionRule | null>(null);
   const [note, setNote] = useState("");
   const [evidenceUrl, setEvidenceUrl] = useState("");
   const [attachments, setAttachments] = useState<string[]>([]);
+  const [isGeneratingSuggestion, setIsGeneratingSuggestion] = useState(false);
   
+  const handleSuggestUpdate = async () => {
+    setIsGeneratingSuggestion(true);
+    try {
+      const res = await fetch("/api/suggest-update", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          issueTitle: issueTitle || "Civic Issue",
+          category: category || "General",
+          currentStatus: selectedTransition?.nextStatus || currentStatus,
+          departmentName: departmentName || "General Department",
+        }),
+      });
+      const data = await res.json();
+      if (data.suggestion) {
+        setNote(data.suggestion);
+        addToast("AI suggestion ready", "success");
+      } else {
+        addToast("Could not generate suggestion", "error");
+      }
+    } catch (err) {
+      console.error(err);
+      addToast("Could not generate suggestion", "error");
+    } finally {
+      setIsGeneratingSuggestion(false);
+    }
+  };
+
   const allowedTransitions = getAllowedTransitions(currentStatus || "Open", (role as UserRole) || UserRole.GUEST);
 
   if (!allowedTransitions || allowedTransitions.length === 0) {
@@ -82,9 +124,22 @@ export function WorkflowActionPanel({ issueId, currentStatus, onTransition, load
             
             {(selectedTransition.requiresNotes || note || true) && (
               <div className="mt-4 space-y-2">
-                <label className="text-xs font-bold text-[var(--color-civic-text-secondary)]">
-                  Progress Note {selectedTransition.requiresNotes && <span className="text-[var(--color-civic-danger)]">*</span>}
-                </label>
+                <div className="flex justify-between items-center mb-1">
+                  <label className="text-xs font-bold text-[var(--color-civic-text-secondary)]">
+                    Progress Note {selectedTransition.requiresNotes && <span className="text-[var(--color-civic-danger)]">*</span>}
+                  </label>
+                  <NeumorphicButton
+                    type="button"
+                    size="sm"
+                    variant="secondary"
+                    onClick={handleSuggestUpdate}
+                    disabled={isGeneratingSuggestion}
+                    className="flex items-center gap-1.5 text-xs py-1 px-2.5 h-auto font-medium"
+                  >
+                    <Sparkles className="w-3.5 h-3.5 text-[var(--color-civic-primary)]" />
+                    {isGeneratingSuggestion ? "Generating..." : "Suggest with AI"}
+                  </NeumorphicButton>
+                </div>
                 <textarea
                   className="w-full bg-[var(--color-civic-surface)] rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-civic-primary)] text-[var(--color-civic-text-primary)] shadow-[var(--shadow-neumorphic-inset)] resize-none"
                   rows={3}

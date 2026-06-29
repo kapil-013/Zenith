@@ -20,7 +20,6 @@ import {
   LogIn,
   LogOut,
   ShieldAlert,
-  Sparkles,
   Users,
   Bell,
   ClipboardCheck,
@@ -28,7 +27,6 @@ import {
   Trophy,
 } from "lucide-react";
 import { NeumorphicButton } from "../ui/button";
-import { DemoGuide } from "../DemoGuide";
 import { motion, AnimatePresence } from "motion/react";
 import { formatDistanceToNow } from "date-fns";
 
@@ -39,14 +37,7 @@ export function Layout() {
   const { notifications, unreadCount, markAsRead } = useNotifications();
   const location = useLocation();
   const navigate = useNavigate();
-  const [demoMode, setDemoMode] = useState(() => {
-    return localStorage.getItem("demoMode") === "true";
-  });
   const [showNotifDropdown, setShowNotifDropdown] = useState(false);
-
-  useEffect(() => {
-    localStorage.setItem("demoMode", String(demoMode));
-  }, [demoMode]);
 
   const navItems = [
     { name: "Explore", path: "/issues", icon: MapPin },
@@ -125,14 +116,6 @@ export function Layout() {
         <div className="absolute bottom-[-10%] right-[-10%] w-[60%] h-[60%] bg-[var(--color-civic-secondary-soft)] rounded-full blur-[150px] opacity-40" />
       </div>
 
-      {demoMode && (
-        <div className="bg-[var(--color-civic-text-primary)] text-white px-4 py-2 text-center text-sm font-bold shadow-md relative z-[60] flex items-center justify-center gap-2">
-          <Sparkles className="h-4 w-4 text-[var(--color-civic-secondary-soft)]" />
-          Demo Mode Active: Follow the guided steps to see Community Hero in
-          action.
-        </div>
-      )}
-
       <header className="sticky top-0 z-50 px-6 py-4 flex items-center justify-between bg-[var(--color-civic-surface)]/70 backdrop-blur-xl border-b border-[var(--color-civic-border)] shadow-[0_4px_30px_rgba(0,0,0,0.02)]">
         <Link
           to="/"
@@ -166,16 +149,6 @@ export function Layout() {
         </nav>
 
         <div className="flex items-center gap-4">
-          <button
-            onClick={() => setDemoMode(!demoMode)}
-            className={`hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all border ${demoMode ? "bg-[var(--color-civic-surface-inset)] text-[var(--color-civic-primary)] border-[var(--color-civic-primary)]/30 shadow-[var(--shadow-neumorphic-inset)]" : "bg-[var(--color-civic-surface)] text-[var(--color-civic-text-secondary)] border-[var(--color-civic-border)] shadow-[var(--shadow-neumorphic)]"}`}
-          >
-            <Sparkles
-              className={`h-3.5 w-3.5 ${demoMode ? "text-[var(--color-civic-primary)]" : "text-[var(--color-civic-text-muted)]"}`}
-            />
-            Demo Mode
-          </button>
-
           {/* Language Switcher */}
           <button
             onClick={() => i18n.changeLanguage(i18n.language === "en" ? "hi" : "en")}
@@ -318,9 +291,6 @@ export function Layout() {
       <main className="flex-1 w-full max-w-7xl mx-auto p-4 sm:p-6 md:p-8 pb-[calc(120px+env(safe-area-inset-bottom))] md:pb-8 z-10">
         <Outlet />
       </main>
-
-      {/* Demo Guide Component */}
-      {demoMode && <DemoGuide />}
 
       {/* Mobile Nav */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-[var(--color-civic-surface)]/80 backdrop-blur-xl p-3 border-t border-[var(--color-civic-border)] shadow-[0_-4px_30px_rgba(0,0,0,0.05)] z-[60] flex justify-around items-center rounded-t-3xl pb-safe overflow-x-auto">

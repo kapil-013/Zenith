@@ -166,7 +166,7 @@ export interface Verification {
   id: string;
   issueId: string;
   userId: string;
-  type: "verify" | "dispute" | "duplicate" | "confirm_resolved";
+  type: "verify" | "dispute" | "duplicate" | "confirm_resolved" | "confirmedResolved";
   createdAt: number;
 }
 

@@ -28,6 +28,11 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+  Legend,
+  Label,
 } from "recharts";
 import { motion, AnimatePresence } from "motion/react";
 import { CheckCircle2 as CheckCircle2Icon } from "lucide-react";
@@ -153,6 +158,57 @@ export function Impact() {
       ).length,
     },
   ];
+
+  // Average Resolution Time by Department calculation
+  const resolvedIssuesWithTime = issues.filter(
+    (i) =>
+      (i.status === "Resolved" || i.status === "Confirmed") &&
+      i.createdAt &&
+      i.updatedAt &&
+      i.assignedTo
+  );
+
+  const deptGroups: Record<string, { totalDays: number; count: number }> = {};
+  resolvedIssuesWithTime.forEach((i) => {
+    const dept = i.assignedTo;
+    if (!dept) return;
+    const days = (i.updatedAt - i.createdAt) / (1000 * 60 * 60 * 24);
+    const positiveDays = Math.max(0.1, days);
+    if (!deptGroups[dept]) {
+      deptGroups[dept] = { totalDays: 0, count: 0 };
+    }
+    deptGroups[dept].totalDays += positiveDays;
+    deptGroups[dept].count += 1;
+  });
+
+  const avgResolutionTimeData = Object.entries(deptGroups).map(([dept, data]) => ({
+    department: dept,
+    avgDays: parseFloat((data.totalDays / data.count).toFixed(1)),
+  }));
+
+  // Issues by Category calculation
+  const categoryCounts: Record<string, number> = {};
+  issues.forEach((i) => {
+    const cat = i.category || "Other";
+    categoryCounts[cat] = (categoryCounts[cat] || 0) + 1;
+  });
+
+  const categoryChartData = Object.entries(categoryCounts).map(([category, count]) => ({
+    name: category,
+    value: count,
+  }));
+
+  const categoryColors: Record<string, string> = {
+    "Pothole": "#92400E",
+    "Garbage Overflow": "#4D7C0F",
+    "Water Leakage": "#0284C7",
+    "Broken Streetlight": "#CA8A04",
+    "Sewage Issue": "#7C2D12",
+    "Road Blockage": "#EA580C",
+    "Damaged Infrastructure": "#475569",
+    "Unsafe Public Area": "#DC2626",
+    "Other": "#64748B",
+  };
 
   return (
     <motion.div
@@ -306,6 +362,143 @@ export function Impact() {
           transition={{ delay: 0.9 }}
         >
           <AIInsightCard insight={insight} loading={loadingInsight} />
+        </motion.div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mt-8">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.95 }}
+        >
+          <NeumorphicCard className="p-8 h-full">
+            <span className="text-xs font-bold uppercase tracking-widest text-[var(--color-civic-text-muted)] block mb-2">
+              Performance Metrics
+            </span>
+            <h3 className="font-extrabold text-xl text-[var(--color-civic-text-primary)] mb-6">
+              Avg. Resolution Time (days)
+            </h3>
+            {avgResolutionTimeData.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-56 text-[var(--color-civic-text-muted)] italic">
+                <span>No data yet</span>
+              </div>
+            ) : (
+              <div className="h-64 w-full">
+                <ResponsiveContainer width="100%" height={260}>
+                  <BarChart layout="vertical" data={avgResolutionTimeData}>
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      horizontal={false}
+                      stroke="rgba(0,0,0,0.1)"
+                    />
+                    <XAxis
+                      type="number"
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{
+                        fill: "var(--color-civic-text-secondary)",
+                        fontWeight: 600,
+                        fontSize: 12,
+                      }}
+                    />
+                    <YAxis
+                      dataKey="department"
+                      type="category"
+                      axisLine={false}
+                      tickLine={false}
+                      width={140}
+                      tick={{
+                        fill: "var(--color-civic-text-secondary)",
+                        fontWeight: 600,
+                        fontSize: 11,
+                      }}
+                    />
+                    <Tooltip
+                      cursor={{ fill: "rgba(0,0,0,0.05)" }}
+                      contentStyle={{
+                        borderRadius: "16px",
+                        border: "none",
+                        boxShadow: "var(--shadow-neumorphic)",
+                        backgroundColor: "var(--color-civic-surface)",
+                        color: "var(--color-civic-text-primary)",
+                        fontWeight: "bold",
+                      }}
+                      formatter={(value) => [`${value} days avg`]}
+                    />
+                    <Bar
+                      dataKey="avgDays"
+                      fill="var(--color-civic-department, var(--color-civic-primary))"
+                      radius={[0, 6, 6, 0]}
+                      barSize={20}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </NeumorphicCard>
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 1.0 }}
+        >
+          <NeumorphicCard className="p-8 h-full">
+            <span className="text-xs font-bold uppercase tracking-widest text-[var(--color-civic-text-muted)] block mb-2">
+              Distribution Metrics
+            </span>
+            <h3 className="font-extrabold text-xl text-[var(--color-civic-text-primary)] mb-6">
+              Issues by Category
+            </h3>
+            {categoryChartData.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-56 text-[var(--color-civic-text-muted)] italic">
+                <span>No data yet</span>
+              </div>
+            ) : (
+              <div className="h-64 w-full">
+                <ResponsiveContainer width="100%" height={260}>
+                  <PieChart>
+                    <Pie
+                      data={categoryChartData}
+                      cx="50%"
+                      cy="40%"
+                      innerRadius={55}
+                      outerRadius={85}
+                      paddingAngle={3}
+                      dataKey="value"
+                    >
+                      {categoryChartData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={categoryColors[entry.name] || "#64748B"} />
+                      ))}
+                      <Label
+                        value={issues.length}
+                        position="center"
+                        fill="var(--color-civic-text-primary)"
+                        style={{ fontSize: "20px", fontWeight: "bold" }}
+                      />
+                    </Pie>
+                    <Tooltip
+                      contentStyle={{
+                        borderRadius: "16px",
+                        border: "none",
+                        boxShadow: "var(--shadow-neumorphic)",
+                        backgroundColor: "var(--color-civic-surface)",
+                        color: "var(--color-civic-text-primary)",
+                        fontWeight: "bold",
+                      }}
+                    />
+                    <Legend
+                      iconType="circle"
+                      layout="horizontal"
+                      align="center"
+                      verticalAlign="bottom"
+                      wrapperStyle={{ fontSize: "11px", paddingTop: "10px" }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </NeumorphicCard>
         </motion.div>
       </div>
 

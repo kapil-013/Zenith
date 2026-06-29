@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { NeumorphicCard, NeumorphicCardInset } from "../components/ui/card";
@@ -12,12 +12,73 @@ import {
   Activity,
   AlertTriangle,
   PlusCircle,
+  MapPin,
+  CheckCircle,
 } from "lucide-react";
 import { NeumorphicBadge } from "../components/ui/badge";
 import { motion } from "motion/react";
+import { collection, query, orderBy, getDocs, where } from "firebase/firestore";
+import { db } from "../lib/firebase";
 
 export function Home() {
   const { t } = useTranslation();
+  const [stats, setStats] = useState<{
+    totalIssues: number;
+    resolvedIssues: number;
+    activeCitizens: number;
+    latestIssue: any | null;
+  } | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchStats() {
+      try {
+        const issuesQuery = query(collection(db, "issues"), orderBy("createdAt", "desc"));
+        const issuesSnap = await getDocs(issuesQuery);
+        
+        let totalIssues = issuesSnap.size;
+        let resolvedIssues = 0;
+        let latestIssue = null;
+        
+        if (!issuesSnap.empty) {
+          const firstDoc = issuesSnap.docs[0];
+          latestIssue = { id: firstDoc.id, ...firstDoc.data() };
+          
+          issuesSnap.forEach((doc) => {
+            const data = doc.data();
+            const status = data.currentStatus || data.status;
+            if (status === "Resolved" || status === "Confirmed") {
+              resolvedIssues++;
+            }
+          });
+        }
+        
+        const usersQuery = query(collection(db, "users"), where("role", "==", "citizen"));
+        const usersSnap = await getDocs(usersQuery);
+        const activeCitizens = usersSnap.size;
+        
+        setStats({
+          totalIssues,
+          resolvedIssues,
+          activeCitizens,
+          latestIssue,
+        });
+      } catch (error) {
+        console.error("Error fetching homepage stats:", error);
+        setStats({
+          totalIssues: 0,
+          resolvedIssues: 0,
+          activeCitizens: 0,
+          latestIssue: null,
+        });
+      } finally {
+        setLoading(false);
+      }
+    }
+    
+    fetchStats();
+  }, []);
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -100,74 +161,138 @@ export function Home() {
           </motion.div>
         </div>
 
-        {/* Right Side: Hero Mock Card */}
+        {/* Right Side: Live Stats Panel */}
         <motion.div
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: 0.4 }}
           className="w-full max-w-md mx-auto lg:ml-auto"
         >
-          <NeumorphicCard className="p-8 relative overflow-hidden transform hover:-translate-y-2 transition-all duration-500 border-l-4 border-l-[var(--color-civic-danger)]">
-            <div className="absolute top-0 right-0 w-48 h-48 bg-[var(--color-civic-danger)] rounded-full blur-3xl -mr-20 -mt-20 opacity-10 pointer-events-none"></div>
-            <div className="flex justify-between items-start mb-6 relative z-10">
-              <div>
-                <h3 className="font-bold text-xl text-[var(--color-civic-text-primary)]">
-                  Dangerous Pothole
-                </h3>
-                <p className="text-sm text-[var(--color-civic-text-secondary)] font-medium mt-1">
-                  Main Street, Sector 4
-                </p>
+          {loading ? (
+            <NeumorphicCard className="p-8 animate-pulse">
+              <div className="grid grid-cols-2 gap-4 mb-6">
+                {[1, 2, 3, 4].map((i) => (
+                  <div key={i} className="h-24 bg-[var(--color-civic-surface-inset)]/40 rounded-xl"></div>
+                ))}
               </div>
-              <NeumorphicBadge variant="danger" className="text-xs px-3 py-1 shadow-md">
-                Urgent
-              </NeumorphicBadge>
-            </div>
-
-            <div className="space-y-4 relative z-10">
-              <NeumorphicCardInset className="flex items-center gap-4 text-sm text-[var(--color-civic-text-primary)] p-3 rounded-xl border-transparent">
-                <AlertTriangle className="h-5 w-5 text-[var(--color-cat-pothole)]" />
-                <span className="font-medium">
-                  Category: <span className="font-bold">Pothole</span>
-                </span>
-              </NeumorphicCardInset>
-              <NeumorphicCardInset className="flex items-center gap-4 text-sm text-[var(--color-civic-text-primary)] p-3 rounded-xl border-transparent">
-                <Users className="h-5 w-5 text-[var(--color-civic-primary)]" />
-                <span className="font-medium">
-                  <span className="font-bold text-[var(--color-civic-primary)]">18 citizens</span>{" "}
-                  verified
-                </span>
-              </NeumorphicCardInset>
-              <NeumorphicCardInset className="flex items-center gap-4 text-sm text-[var(--color-civic-text-primary)] p-3 rounded-xl border-transparent">
-                <Activity className="h-5 w-5 text-[var(--color-civic-department)]" />
-                <span className="font-medium">
-                  Status:{" "}
-                  <span className="font-bold text-[var(--color-civic-department)]">In Progress</span>
-                </span>
-              </NeumorphicCardInset>
-              <NeumorphicCardInset className="flex items-center gap-4 text-sm text-[var(--color-civic-text-primary)] p-3 rounded-xl border-transparent">
-                <ShieldAlert className="h-5 w-5 text-[var(--color-civic-admin)]" />
-                <span className="font-medium">
-                  Assigned to <span className="font-bold">Road Maintenance</span>
-                </span>
-              </NeumorphicCardInset>
-            </div>
-
-            <div className="mt-8 flex items-center justify-between pt-6 border-t border-[var(--color-civic-border)]/60 relative z-10">
-              <div className="flex items-center gap-3">
-                <div className="w-14 h-14 rounded-full bg-[var(--color-civic-surface-inset)] shadow-[var(--shadow-neumorphic-inset)] flex items-center justify-center border border-[var(--color-civic-danger)]/20">
-                  <span className="text-xl font-black text-[var(--color-civic-danger)]">87</span>
-                </div>
-                <div className="flex flex-col">
-                  <span className="text-xs text-[var(--color-civic-text-muted)] uppercase font-bold tracking-widest">
-                    Priority Score
-                  </span>
-                  <span className="text-sm font-bold text-[var(--color-civic-text-primary)]">
-                    Critical Severity
-                  </span>
-                </div>
+              <div className="mt-6 pt-6 border-t border-[var(--color-civic-border)]/60">
+                <div className="h-4 w-24 bg-[var(--color-civic-surface-inset)]/40 rounded mb-3"></div>
+                <div className="h-16 bg-[var(--color-civic-surface-inset)]/40 rounded-xl"></div>
               </div>
-            </div>
-          </NeumorphicCard>
+            </NeumorphicCard>
+          ) : (
+            <NeumorphicCard className="p-8 relative overflow-hidden transform hover:-translate-y-1 transition-all duration-300 border-l-4 border-l-[var(--color-civic-primary)]">
+              <div className="grid grid-cols-2 gap-4 mb-6 relative z-10">
+                {/* Issues Reported */}
+                <NeumorphicCardInset className="p-4 flex flex-col justify-between rounded-xl border-transparent">
+                  <div className="flex justify-between items-start">
+                    <MapPin className="h-5 w-5 text-[var(--color-civic-primary)]" />
+                  </div>
+                  <div className="mt-2">
+                    <div className="text-2xl md:text-3xl font-extrabold text-[var(--color-civic-text-primary)] leading-none mb-1">
+                      {stats?.totalIssues ?? 0}
+                    </div>
+                    <div className="text-[10px] text-[var(--color-civic-text-muted)] font-bold uppercase tracking-wider">
+                      Issues Reported
+                    </div>
+                  </div>
+                </NeumorphicCardInset>
+
+                {/* Resolved */}
+                <NeumorphicCardInset className="p-4 flex flex-col justify-between rounded-xl border-transparent">
+                  <div className="flex justify-between items-start">
+                    <CheckCircle className="h-5 w-5 text-[var(--color-civic-secondary)]" />
+                  </div>
+                  <div className="mt-2">
+                    <div className="text-2xl md:text-3xl font-extrabold text-[var(--color-civic-text-primary)] leading-none mb-1">
+                      {stats?.resolvedIssues ?? 0}
+                    </div>
+                    <div className="text-[10px] text-[var(--color-civic-text-muted)] font-bold uppercase tracking-wider">
+                      Resolved
+                    </div>
+                  </div>
+                </NeumorphicCardInset>
+
+                {/* Active Citizens */}
+                <NeumorphicCardInset className="p-4 flex flex-col justify-between rounded-xl border-transparent">
+                  <div className="flex justify-between items-start">
+                    <Users className="h-5 w-5 text-[var(--color-civic-admin)]" />
+                  </div>
+                  <div className="mt-2">
+                    <div className="text-2xl md:text-3xl font-extrabold text-[var(--color-civic-text-primary)] leading-none mb-1">
+                      {stats?.activeCitizens ?? 0}
+                    </div>
+                    <div className="text-[10px] text-[var(--color-civic-text-muted)] font-bold uppercase tracking-wider">
+                      Active Citizens
+                    </div>
+                  </div>
+                </NeumorphicCardInset>
+
+                {/* Resolution Rate */}
+                <NeumorphicCardInset className="p-4 flex flex-col justify-between rounded-xl border-transparent">
+                  <div className="flex justify-between items-start">
+                    <TrendingUp className="h-5 w-5 text-[var(--color-civic-department)]" />
+                  </div>
+                  <div className="mt-2">
+                    <div className="text-2xl md:text-3xl font-extrabold text-[var(--color-civic-text-primary)] leading-none mb-1">
+                      {stats && stats.totalIssues > 0
+                        ? ((stats.resolvedIssues / stats.totalIssues) * 100).toFixed(0) + "%"
+                        : "0%"}
+                    </div>
+                    <div className="text-[10px] text-[var(--color-civic-text-muted)] font-bold uppercase tracking-wider">
+                      Resolution Rate
+                    </div>
+                  </div>
+                </NeumorphicCardInset>
+              </div>
+
+              {/* Latest Report Section */}
+              <div className="mt-6 pt-6 border-t border-[var(--color-civic-border)]/60 relative z-10">
+                <span className="text-xs font-bold uppercase tracking-widest text-[var(--color-civic-text-muted)] block mb-3">
+                  Latest Report
+                </span>
+                {stats?.latestIssue ? (
+                  <NeumorphicCardInset className="p-4 rounded-xl border-transparent flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                    <div className="space-y-1">
+                      <h4 className="font-bold text-sm text-[var(--color-civic-text-primary)] leading-tight">
+                        {stats.latestIssue.title.length > 40
+                          ? stats.latestIssue.title.substring(0, 40) + "..."
+                          : stats.latestIssue.title}
+                      </h4>
+                      <div className="flex flex-wrap gap-2 items-center">
+                        <NeumorphicBadge variant="primary" className="text-[9px] px-2 py-0.5">
+                          {stats.latestIssue.category}
+                        </NeumorphicBadge>
+                        <NeumorphicBadge
+                          variant={
+                            stats.latestIssue.status === "Resolved" ||
+                            stats.latestIssue.status === "Confirmed"
+                              ? "success"
+                              : stats.latestIssue.status === "In Progress"
+                              ? "primary"
+                              : "warning"
+                          }
+                          className="text-[9px] px-2 py-0.5"
+                        >
+                          {stats.latestIssue.status}
+                        </NeumorphicBadge>
+                      </div>
+                    </div>
+                    <Link
+                      to="/issues"
+                      className="text-xs font-bold text-[var(--color-civic-primary)] hover:underline shrink-0 flex items-center gap-1 self-end sm:self-center"
+                    >
+                      View →
+                    </Link>
+                  </NeumorphicCardInset>
+                ) : (
+                  <div className="text-sm text-[var(--color-civic-text-muted)] italic">
+                    No reports submitted yet.
+                  </div>
+                )}
+              </div>
+            </NeumorphicCard>
+          )}
         </motion.div>
       </div>
 

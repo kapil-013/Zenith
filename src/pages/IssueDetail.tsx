@@ -23,6 +23,7 @@ import { AIExplainabilityWidget } from "../components/ui/intelligence/AIExplaina
 import {
   ShieldAlert,
   Users,
+  CheckCircle,
   CheckCircle2,
   AlertTriangle,
   MapPin,
@@ -44,6 +45,7 @@ export function IssueDetail() {
   const [userActions, setUserActions] = useState<Verification[]>([]);
   const [allVerifications, setAllVerifications] = useState<Verification[]>([]);
   const [loading, setLoading] = useState(true);
+  const [hasConfirmedResolved, setHasConfirmedResolved] = useState(false);
 
   useEffect(() => {
     async function fetchIssue() {
@@ -78,6 +80,16 @@ export function IssueDetail() {
           );
           setUserActions(actions);
         }
+
+        // check if user has already confirmed resolved (type: "confirmedResolved")
+        const qResolved = query(
+          collection(db, "verifications"),
+          where("issueId", "==", id),
+          where("userId", "==", user.id),
+          where("type", "==", "confirmedResolved"),
+        );
+        const resolvedSnap = await getDocs(qResolved);
+        setHasConfirmedResolved(!resolvedSnap.empty);
       }
       setLoading(false);
     }
@@ -148,6 +160,92 @@ export function IssueDetail() {
     } catch (e) {
       console.error(e);
       addToast("Failed to update status", "error");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleConfirmFixed = async (isFixed: boolean) => {
+    if (!user || !issue) return;
+    setLoading(true);
+    try {
+      const issueRef = doc(db, "issues", issue.id);
+      const userRef = doc(db, "users", user.id);
+      
+      if (isFixed) {
+        await addDoc(collection(db, "verifications"), {
+          issueId: issue.id,
+          userId: user.id,
+          userName: user.name || "Citizen",
+          type: "confirmedResolved",
+          createdAt: Date.now()
+        });
+
+        const currentCount = issue.confirmedResolvedCount || 0;
+        const newCount = currentCount + 1;
+        
+        const updates: any = {
+          confirmedResolvedCount: increment(1)
+        };
+
+        if (newCount >= 3) {
+          updates.status = "Confirmed";
+          updates.currentStatus = "Confirmed";
+          
+          await addDoc(collection(db, "status_updates"), {
+            issueId: issue.id,
+            status: "Confirmed",
+            note: "Community confirmed this issue is resolved.",
+            actorRole: "citizen",
+            updatedBy: user.id,
+            createdAt: Date.now(),
+          });
+
+          await dispatcher.dispatch({
+            type: "CitizenConfirmedResolution",
+            actorId: user.id,
+            actorRole: user.role,
+            affectedIssueId: issue.id,
+            affectedUsers: [issue.createdBy],
+            departmentId: issue.assignedTo || undefined,
+          });
+        }
+
+        await updateDoc(userRef, { points: increment(10) });
+        await updateDoc(issueRef, updates);
+
+        addToast("Thanks for confirming!", "success");
+        setHasConfirmedResolved(true);
+        setIssue((prev) => prev ? { 
+          ...prev, 
+          ...updates, 
+          confirmedResolvedCount: (prev.confirmedResolvedCount || 0) + 1,
+          status: newCount >= 3 ? "Confirmed" : prev.status,
+          currentStatus: newCount >= 3 ? "Confirmed" : prev.currentStatus
+        } : prev);
+      } else {
+        await addDoc(collection(db, "verifications"), {
+          issueId: issue.id,
+          userId: user.id,
+          userName: user.name || "Citizen",
+          type: "dispute",
+          createdAt: Date.now()
+        });
+
+        await updateDoc(issueRef, {
+          disputeCount: increment(1)
+        });
+
+        addToast("Noted — we'll flag this for review.", "success");
+        setHasConfirmedResolved(true);
+        setIssue((prev) => prev ? { 
+          ...prev, 
+          disputeCount: (prev.disputeCount || 0) + 1 
+        } : prev);
+      }
+    } catch (e) {
+      console.error(e);
+      addToast("Failed to submit confirmation", "error");
     } finally {
       setLoading(false);
     }
@@ -488,9 +586,59 @@ export function IssueDetail() {
                 />
               </div>
 
+              {user && user.role === "citizen" && (issue.currentStatus || issue.status) === "Resolved" && (
+                <div className="my-6">
+                  {!hasConfirmedResolved ? (
+                    <NeumorphicCard className="p-6 border-l-4 border-l-[var(--color-civic-success)] shadow-[var(--shadow-neumorphic)] relative overflow-hidden bg-[var(--color-civic-surface)]">
+                      <div className="flex gap-4 items-start">
+                        <CheckCircle className="h-6 w-6 text-[var(--color-civic-success)] shrink-0 mt-1" />
+                        <div className="space-y-4 flex-1">
+                          <div>
+                            <h3 className="font-extrabold text-lg text-[var(--color-civic-text-primary)]">
+                              Is this fixed?
+                            </h3>
+                            <p className="text-sm text-[var(--color-civic-text-secondary)] mt-1 font-medium leading-relaxed">
+                              Department has marked this resolved. Confirm if the issue is actually fixed in your area to close the loop.
+                            </p>
+                          </div>
+                          <div className="flex flex-wrap gap-3">
+                            <NeumorphicButton
+                              variant="primary"
+                              size="sm"
+                              className="font-bold flex items-center gap-1.5"
+                              onClick={() => handleConfirmFixed(true)}
+                              disabled={loading}
+                            >
+                              Yes, it's fixed ✓
+                            </NeumorphicButton>
+                            <NeumorphicButton
+                              variant="secondary"
+                              size="sm"
+                              className="font-bold text-[var(--color-civic-danger)]"
+                              onClick={() => handleConfirmFixed(false)}
+                              disabled={loading}
+                            >
+                              No, still an issue
+                            </NeumorphicButton>
+                          </div>
+                        </div>
+                      </div>
+                    </NeumorphicCard>
+                  ) : (
+                    <div className="flex justify-start">
+                      <NeumorphicBadge variant="success" className="px-4 py-2 text-sm font-bold shadow-sm">
+                        ✓ You confirmed this fix
+                      </NeumorphicBadge>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {user && (
                 <WorkflowActionPanel
                   issueId={issue.id}
+                  issueTitle={issue.title}
+                  category={issue.category}
                   currentStatus={issue.currentStatus || issue.status}
                   onTransition={handleTransition}
                   loading={loading}
