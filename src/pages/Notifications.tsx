@@ -66,7 +66,7 @@ export function Notifications() {
                         </p>
                       </div>
                       <span className="text-[10px] font-bold tracking-wider uppercase text-[var(--color-civic-text-muted)] whitespace-nowrap shrink-0 bg-[var(--color-civic-surface)] px-2 py-1 rounded-md shadow-sm">
-                        {formatDistanceToNow(notif.createdAt, { addSuffix: true })}
+                        {notif.createdAt ? formatDistanceToNow((notif as any).createdAt?.toDate ? (notif as any).createdAt.toDate() : notif.createdAt, { addSuffix: true }) : "Recently"}
                       </span>
                     </div>
                     <div className="mt-3 flex items-center justify-between">

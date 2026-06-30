@@ -572,7 +572,7 @@ ${JSON.stringify(
       const { issues } = req.body;
       if (!issues) return res.json({ forecasts: [] });
       
-      const buckets = {};
+      const buckets: Record<string, { category: string, area: string, timestamps: number[] }> = {};
 
       issues.forEach((data) => {
         const category = data.category;

@@ -58,8 +58,8 @@ const issues = [
     duplicateOf: null,
     createdBy: "demo_uid_communityherocitizen",
     assignedTo: null,
-    createdAt: Timestamp.fromDate(addDays(new Date(), -2)),
-    updatedAt: Timestamp.fromDate(new Date()),
+    createdAt: addDays(new Date(), -2).getTime(),
+    updatedAt: Date.now(),
   },
   {
     title: "Series of Potholes on Market Chowk",

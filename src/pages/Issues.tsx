@@ -59,8 +59,8 @@ export function Issues() {
     if (filterSeverity !== "All" && issue.severity !== filterSeverity) return false;
     if (
       search &&
-      !issue.title.toLowerCase().includes(search.toLowerCase()) &&
-      !issue.category.toLowerCase().includes(search.toLowerCase())
+      !(issue.title?.toLowerCase() || "").includes(search.toLowerCase()) &&
+      !(issue.category?.toLowerCase() || "").includes(search.toLowerCase())
     )
       return false;
     return true;

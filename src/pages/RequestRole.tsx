@@ -82,10 +82,15 @@ export function RequestRole() {
         userId: user.id,
         userEmail: user.email,
         userName: user.name,
+        currentRole: user.role,
         requestedRole: "department",
         departmentName,
         reason,
         status: "pending",
+        reviewedBy: null,
+        reviewerName: null,
+        reviewNote: null,
+        reviewedAt: null,
         createdAt: Date.now(),
         updatedAt: Date.now()
       };

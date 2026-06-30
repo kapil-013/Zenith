@@ -80,7 +80,7 @@ export function IssueCard({ issue, onClick }: { issue: Issue, onClick?: () => vo
           </div>
           <div className="flex items-center gap-2 text-sm text-[var(--color-civic-text-primary)] bg-[var(--color-civic-surface-inset)] py-1.5 px-3 rounded-lg shadow-[var(--shadow-neumorphic-inset)]">
             <Clock className="h-4 w-4 text-[var(--color-civic-department)]" />
-            <span className="font-bold text-xs">{formatDistanceToNow(issue.createdAt)} <span className="text-[var(--color-civic-text-muted)] font-medium">ago</span></span>
+            <span className="font-bold text-xs">{issue.createdAt ? formatDistanceToNow((issue as any).createdAt?.toDate ? (issue as any).createdAt.toDate() : issue.createdAt) : "Recently"} <span className="text-[var(--color-civic-text-muted)] font-medium">ago</span></span>
           </div>
         </div>
 

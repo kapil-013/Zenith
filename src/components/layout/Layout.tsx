@@ -218,7 +218,7 @@ export function Layout() {
                                     {notif.title}
                                   </span>
                                   <span className="text-[10px] text-[var(--color-civic-text-muted)] shrink-0 ml-2">
-                                    {formatDistanceToNow(notif.createdAt)} ago
+                                    {notif.createdAt ? formatDistanceToNow((notif as any).createdAt?.toDate ? (notif as any).createdAt.toDate() : notif.createdAt) : "Recently"} ago
                                   </span>
                                 </div>
                                 <p

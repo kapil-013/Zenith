@@ -95,7 +95,7 @@ export function StatusTimeline({
                   </div>
                   <span className="text-xs text-[var(--color-civic-text-muted)] flex items-center gap-1 font-bold bg-[var(--color-civic-surface)] shadow-sm px-2 py-1 rounded-md shrink-0">
                     <Clock className="h-3 w-3" />
-                    {formatDistanceToNow(update.createdAt, { addSuffix: true })}
+                    {update.createdAt ? formatDistanceToNow((update as any).createdAt?.toDate ? (update as any).createdAt.toDate() : update.createdAt, { addSuffix: true }) : "Recently"}
                   </span>
                 </div>
                 {update.note && <p className={`text-sm font-medium mt-2 ${isLatest ? 'text-[var(--color-civic-text-primary)]' : 'text-[var(--color-civic-text-secondary)]'}`}>{update.note}</p>}
