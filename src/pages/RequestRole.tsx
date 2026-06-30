@@ -18,6 +18,7 @@ import {
   orderBy,
   getDocs,
   limit,
+  addDoc
 } from "firebase/firestore";
 import { db, auth } from "../lib/firebase";
 import { RoleRequest } from "../types";
@@ -76,22 +77,20 @@ export function RequestRole() {
 
     try {
       setSubmitting(true);
-      const token = await auth.currentUser.getIdToken();
-      const res = await fetch("/api/role-requests", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          requestedRole: "department",
-          departmentName,
-          reason,
-        }),
-      });
+      
+      const newRequest: Omit<RoleRequest, "id"> = {
+        userId: user.id,
+        userEmail: user.email,
+        userName: user.name,
+        requestedRole: "department",
+        departmentName,
+        reason,
+        status: "pending",
+        createdAt: Date.now(),
+        updatedAt: Date.now()
+      };
 
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to submit request");
+      await addDoc(collection(db, "roleRequests"), newRequest);
 
       addToast("Request submitted for review", "success");
       setDepartmentName("");

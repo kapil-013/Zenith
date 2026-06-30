@@ -5,7 +5,8 @@ import { NeumorphicInput } from "../components/ui/input";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 import { Users, Plus, ShieldBan } from "lucide-react";
-import { auth } from "../lib/firebase";
+import { auth, db } from "../lib/firebase";
+import { collection, getDocs } from "firebase/firestore";
 import { isAdminOrSuperAdmin, hasPermission, Permission, isSuperAdmin, isDepartment, UserRole } from "../lib/auth/permissions";
 
 export function AdminUsers() {
@@ -18,14 +19,9 @@ export function AdminUsers() {
 
   const fetchUsers = async () => {
     try {
-      if (!auth.currentUser) return;
-      const token = await auth.currentUser.getIdToken();
-      const res = await fetch("/api/admin/users", {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (!res.ok) throw new Error("Failed to fetch");
-      const data = await res.json();
-      setUsers(data);
+      const usersRef = collection(db, "users");
+      const snap = await getDocs(usersRef);
+      setUsers(snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
     } catch (e) {
       addToast("Failed to fetch users", "error");
     } finally {
@@ -39,47 +35,12 @@ export function AdminUsers() {
 
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
-    try {
-      if (!auth.currentUser) return;
-      const token = await auth.currentUser.getIdToken();
-      const res = await fetch("/api/admin/create-user", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify(newUser)
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-      
-      addToast(newUser.role === UserRole.DEPARTMENT ? "Department account created. Share these credentials securely." : "Admin account created.", "success");
-      setShowModal(false);
-      setNewUser({ name: "", email: "", password: "", role: "department", departmentName: "" });
-      fetchUsers();
-    } catch (e: any) {
-      addToast(e.message, "error");
-    }
+    addToast("User creation is disabled in demo mode without Admin SDK.", "error");
+    setShowModal(false);
   };
 
   const handleDisableUser = async (uid: string, disabled: boolean) => {
-    try {
-      if (!auth.currentUser) return;
-      const token = await auth.currentUser.getIdToken();
-      const res = await fetch("/api/admin/disable-user", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({ uid, disabled })
-      });
-      if (!res.ok) throw new Error("Failed to update status");
-      addToast(disabled ? "User disabled" : "User enabled", "success");
-      fetchUsers();
-    } catch (e) {
-      addToast("Failed to update status", "error");
-    }
+    addToast("User management is disabled in demo mode.", "error");
   };
 
   return (

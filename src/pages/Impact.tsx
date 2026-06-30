@@ -103,18 +103,12 @@ export function Impact() {
   const fetchPredictiveHotspots = async () => {
     setLoadingForecasts(true);
     try {
-      const user = auth.currentUser;
-      if (!user) {
-        addToast("Please sign in first.", "error");
-        return;
-      }
-      const token = await user.getIdToken();
       const res = await fetch("/api/intelligence/predict-hotspots", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
         },
+        body: JSON.stringify({ issues }),
       });
       if (res.ok) {
         const data = await res.json();

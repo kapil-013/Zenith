@@ -6,24 +6,28 @@ service cloud.firestore {
     }
     
     function getUserData() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+      let userDoc = /databases/$(database)/documents/users/$(request.auth.uid);
+      return exists(userDoc) ? get(userDoc).data : null;
     }
     
     function isSuperAdmin() {
-      return isSignedIn() && getUserData().role == 'super_admin';
+      let data = getUserData();
+      return isSignedIn() && data != null && data.role == 'super_admin';
     }
 
     function isAdmin() {
-      return isSignedIn() && (getUserData().role == 'admin' || getUserData().role == 'super_admin');
+      let data = getUserData();
+      return isSignedIn() && data != null && (data.role == 'admin' || data.role == 'super_admin');
     }
     
     function isDepartment() {
-      return isSignedIn() && getUserData().role == 'department';
+      let data = getUserData();
+      return isSignedIn() && data != null && data.role == 'department';
     }
 
     match /users/{userId} {
-      allow read: if isSignedIn();
-      allow create: if isSuperAdmin() || (isSignedIn() && request.auth.uid == userId && request.resource.data.role == 'citizen');
+      allow read: if true;
+      allow create: if isSuperAdmin() || (isSignedIn() && request.auth.uid == userId && (request.resource.data.role == 'citizen' || (request.resource.data.role == 'super_admin' && (request.auth.token.email == 'k06apil@gmail.com' || request.auth.token.email == 'communityhero.superadmin@demo.app'))));
       allow update: if isSuperAdmin() || (isSignedIn() && request.auth.uid == userId && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'departmentName', 'points', 'badges']) || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['role', 'lastLoginAt', 'updatedAt']) && request.resource.data.role == 'citizen'))); 
       allow delete: if isSuperAdmin();
     }
@@ -67,7 +71,10 @@ service cloud.firestore {
         resource.data.recipientId == request.auth.uid || isSuperAdmin()
       );
       allow create: if isSignedIn();
-      allow update, delete: if isSuperAdmin();
+      allow update: if isSignedIn() && (
+        resource.data.recipientId == request.auth.uid || isSuperAdmin()
+      ) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['readAt', 'dismissedAt']);
+      allow delete: if isSuperAdmin();
     }
 
     match /{document=**} {

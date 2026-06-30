@@ -5,7 +5,8 @@ import { NeumorphicInput } from "../components/ui/input";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 import { ClipboardCheck, CheckCircle, XCircle } from "lucide-react";
-import { auth } from "../lib/firebase";
+import { auth, db } from "../lib/firebase";
+import { collection, getDocs, query, where, doc, updateDoc, getDoc } from "firebase/firestore";
 import { isDepartment, isAdminOrSuperAdmin } from "../lib/auth/permissions";
 import { RoleRequest } from "../types";
 
@@ -28,24 +29,12 @@ export function RoleRequests() {
 
   const fetchRequests = async () => {
     try {
-      if (!auth.currentUser) return;
-      const token = await auth.currentUser.getIdToken();
+      const qPending = query(collection(db, "roleRequests"), where("status", "==", "pending"));
+      const snapPending = await getDocs(qPending);
+      setPendingRequests(snapPending.docs.map(doc => ({ id: doc.id, ...doc.data() } as RoleRequest)));
 
-      const resPending = await fetch("/api/role-requests?status=pending", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!resPending.ok) throw new Error("Failed to fetch pending requests");
-      const dataPending = await resPending.json();
-      setPendingRequests(dataPending);
-
-      const resHistory = await fetch("/api/role-requests", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!resHistory.ok) throw new Error("Failed to fetch all requests");
-      const dataHistory = await resHistory.json();
-      setHistoryRequests(
-        dataHistory.filter((r: RoleRequest) => r.status !== "pending"),
-      );
+      const snapAll = await getDocs(collection(db, "roleRequests"));
+      setHistoryRequests(snapAll.docs.map(doc => ({ id: doc.id, ...doc.data() } as RoleRequest)).filter(r => r.status !== "pending"));
     } catch (e) {
       addToast("Failed to fetch requests", "error");
     } finally {
@@ -69,31 +58,27 @@ export function RoleRequests() {
     if (!selectedRequestId || !modalAction) return;
 
     if (modalAction === "reject" && reviewNote.length < 5) {
-      addToast(
-        "Review note must be at least 5 characters for rejection.",
-        "error",
-      );
+      addToast("Review note must be at least 5 characters for rejection.", "error");
       return;
     }
 
     try {
-      if (!auth.currentUser) return;
-      const token = await auth.currentUser.getIdToken();
+      const requestRef = doc(db, "roleRequests", selectedRequestId);
+      const requestSnap = await getDoc(requestRef);
+      if (!requestSnap.exists()) throw new Error("Request not found");
+      const requestData = requestSnap.data() as RoleRequest;
 
-      const res = await fetch(
-        `/api/role-requests/${selectedRequestId}/${modalAction}`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ reviewNote }),
-        },
-      );
+      await updateDoc(requestRef, {
+        status: modalAction === "approve" ? "approved" : "rejected",
+        reviewNote,
+        reviewedBy: auth.currentUser?.uid || "admin",
+        reviewedAt: Date.now()
+      });
 
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
+      if (modalAction === "approve") {
+        const userRef = doc(db, "users", requestData.userId);
+        await updateDoc(userRef, { role: requestData.requestedRole });
+      }
 
       addToast(`Request ${modalAction}d successfully.`, "success");
       setShowModal(false);

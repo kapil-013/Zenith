@@ -10,7 +10,7 @@ import {
   onAuthStateChanged,
   User as FirebaseUser,
 } from "firebase/auth";
-import { doc, getDoc, updateDoc, onSnapshot } from "firebase/firestore";
+import { doc, getDoc, setDoc, updateDoc, onSnapshot } from "firebase/firestore";
 import { User } from "../types";
 
 interface AuthContextType {
@@ -31,52 +31,90 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const syncInProgress = React.useRef<Record<string, Promise<void>>>({});
+
+  const syncAndLoadUser = async (firebaseUser: FirebaseUser) => {
+    const uid = firebaseUser.uid;
+    if (syncInProgress.current[uid]) {
+      return syncInProgress.current[uid];
+    }
+
+    const promise = (async () => {
+      const userRef = doc(db, "users", uid);
+      let userSnap = await getDoc(userRef);
+
+      if (!userSnap.exists()) {
+        const isBootstrapAdmin = firebaseUser.email && (firebaseUser.email.toLowerCase() === "k06apil@gmail.com" || firebaseUser.email.toLowerCase() === "communityhero.superadmin@demo.app");
+        const role = isBootstrapAdmin ? "super_admin" : "citizen";
+        
+        await setDoc(userRef, {
+          id: uid,
+          email: firebaseUser.email || "",
+          name: firebaseUser.displayName || "Citizen",
+          photoURL: firebaseUser.photoURL || "",
+          role: role,
+          status: "active",
+          points: 0,
+          badges: [],
+          civicScore: 0,
+          createdAt: Date.now(),
+        });
+        userSnap = await getDoc(userRef);
+      } else {
+        const updates: any = {
+          lastLoginAt: Date.now(),
+          updatedAt: Date.now()
+        };
+        await updateDoc(userRef, updates);
+        userSnap = await getDoc(userRef);
+      }
+
+      if (userSnap.exists()) {
+        setUser({ ...(docSnap => {
+          return { ...(docSnap.data() as User), id: docSnap.id };
+        })(userSnap) });
+      }
+    })();
+
+    syncInProgress.current[uid] = promise;
+    try {
+      await promise;
+    } finally {
+      delete syncInProgress.current[uid];
+    }
+  };
 
   useEffect(() => {
     let unsubscribeSnapshot: (() => void) | undefined;
 
     const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (firebaseUser) {
-        const userRef = doc(db, "users", firebaseUser.uid);
-        let userSnap = await getDoc(userRef);
+      try {
+        if (firebaseUser) {
+          await syncAndLoadUser(firebaseUser);
 
-        if (!userSnap.exists()) {
-          // Synchronize with backend to safely bootstrap admin if needed
-          const token = await firebaseUser.getIdToken();
-          await fetch("/api/auth/sync-user", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify({
-              name: firebaseUser.displayName || "Citizen",
-              photoURL: firebaseUser.photoURL || "",
-            }),
+          // Live listener
+          const userRef = doc(db, "users", firebaseUser.uid);
+          unsubscribeSnapshot = onSnapshot(userRef, (docSnap) => {
+            if (docSnap.exists()) {
+              setUser({ ...(docSnap.data() as User), id: docSnap.id });
+            } else {
+              setUser(null);
+            }
+            setLoading(false);
+          }, (error) => {
+            console.error("Firestore user onSnapshot error:", error);
+            setLoading(false);
           });
         } else {
-          const updates: any = {
-            lastLoginAt: Date.now(),
-            updatedAt: Date.now()
-          };
-          await updateDoc(userRef, updates);
-        }
-
-        // Live listener
-        unsubscribeSnapshot = onSnapshot(userRef, (docSnap) => {
-          if (docSnap.exists()) {
-            setUser({ ...(docSnap.data() as User), id: docSnap.id });
-          } else {
-            setUser(null);
-          }
+          setUser(null);
           setLoading(false);
-        });
-      } else {
-        setUser(null);
-        setLoading(false);
-        if (unsubscribeSnapshot) {
-          unsubscribeSnapshot();
+          if (unsubscribeSnapshot) {
+            unsubscribeSnapshot();
+          }
         }
+      } catch (error) {
+        console.error("onAuthStateChanged error caught:", error);
+        setLoading(false);
       }
     });
 
@@ -93,9 +131,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signInWithGoogle = async () => {
+    setLoading(true);
     try {
       const provider = new GoogleAuthProvider();
-      await signInWithPopup(auth, provider);
+      const result = await signInWithPopup(auth, provider);
+      if (result.user) {
+        await syncAndLoadUser(result.user);
+      }
     } catch (error: any) {
       if (
         error.code !== "auth/popup-closed-by-user" &&
@@ -103,7 +145,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         error.code !== "auth/cancelled-popup-request"
       ) {
         console.error("Google sign in failed:", error);
+        throw error;
       }
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -112,22 +157,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const registerCitizen = async (name: string, email: string, pass: string) => {
-    const cred = await createUserWithEmailAndPassword(auth, email, pass);
-    
-    // Instead of directly writing to Firestore, we let the sync API handle it so we don't duplicate code
-    // However, we want to ensure name is passed
-    const token = await cred.user.getIdToken();
-    await fetch("/api/auth/sync-user", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({
+    setLoading(true);
+    try {
+      const cred = await createUserWithEmailAndPassword(auth, email, pass);
+      const isBootstrapAdmin = email.toLowerCase() === "k06apil@gmail.com" || email.toLowerCase() === "communityhero.superadmin@demo.app";
+      
+      const userRef = doc(db, "users", cred.user.uid);
+      await setDoc(userRef, {
+        id: cred.user.uid,
+        email: email,
         name: name,
         photoURL: "",
-      }),
-    });
+        role: isBootstrapAdmin ? "super_admin" : "citizen",
+        status: "active",
+        points: 0,
+        badges: [],
+        civicScore: 0,
+        createdAt: Date.now(),
+      });
+      await syncAndLoadUser(cred.user);
+    } catch (error: any) {
+      console.error("Registration failed:", error);
+      throw error;
+    } finally {
+      setLoading(false);
+    }
   };
 
   const resetPassword = async (email: string) => {

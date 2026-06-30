@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { db } from "../lib/firebase";
 import {
   collection,
@@ -20,6 +20,9 @@ import { ReputationEngine } from "../lib/reputation/engine";
 
 export function useUserStats() {
   const { user } = useAuth();
+  const userRef = useRef(user);
+  userRef.current = user; // Synchronously keep user ref pointing to the freshest user state during render
+
   const [stats, setStats] = useState<UserStatistics>({
     issuesReported: 0,
     issuesVerified: 0,
@@ -43,7 +46,8 @@ export function useUserStats() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!user) {
+    const currentUserId = user?.id;
+    if (!currentUserId) {
       setLoading(false);
       return;
     }
@@ -52,18 +56,20 @@ export function useUserStats() {
 
     const issuesQ = query(
       collection(db, "issues"),
-      where("createdBy", "==", user.id),
+      where("createdBy", "==", currentUserId),
     );
     const verificationsQ = query(
       collection(db, "verifications"),
-      where("userId", "==", user.id),
+      where("userId", "==", currentUserId),
     );
-    // Also fetch issues verified by the user to calculate impact
 
     let userIssues: Issue[] = [];
     let userVerifications: Verification[] = [];
 
     const calculate = async () => {
+      const currentUser = userRef.current;
+      if (!currentUser) return;
+
       let issuesReported = userIssues.length;
       let issuesVerified = 0;
       let successfulResolutions = 0;
@@ -99,7 +105,7 @@ export function useUserStats() {
         issuesReported,
         issuesVerified,
         successfulResolutions,
-        departmentsAssisted: successfulResolutions > 0 ? 1 : 0, // Approx
+        departmentsAssisted: successfulResolutions > 0 ? 1 : 0,
         estimatedCitizensImpacted,
         falseReports,
         rejectedReports,
@@ -115,8 +121,7 @@ export function useUserStats() {
       );
       const nxtLevel = ReputationEngine.getNextLevel(newCivicScore);
 
-      // Load current achievements from user document or evaluate new ones
-      const currentAchievements = user.achievements || [];
+      const currentAchievements = currentUser.achievements || [];
       const evaluatedAchievements = ReputationEngine.evaluateBadges(
         userStats,
         currentAchievements,
@@ -131,15 +136,14 @@ export function useUserStats() {
       setAchievements(evaluatedAchievements);
       setNextLevel(nxtLevel);
 
-      // Optionally sync to user document if values changed significantly
       if (
-        user.civicScore !== newCivicScore ||
-        user.trustScore !== newTrustScore ||
-        user.currentLevel !== newLevel ||
-        (user.achievements || []).length !== evaluatedAchievements.length
+        currentUser.civicScore !== newCivicScore ||
+        currentUser.trustScore !== newTrustScore ||
+        currentUser.currentLevel !== newLevel ||
+        (currentUser.achievements || []).length !== evaluatedAchievements.length
       ) {
         try {
-          await updateDoc(doc(db, "users", user.id), {
+          await updateDoc(doc(db, "users", currentUser.id), {
             civicScore: newCivicScore,
             trustScore: newTrustScore,
             currentLevel: newLevel,
@@ -158,18 +162,24 @@ export function useUserStats() {
     const unsubIssues = onSnapshot(issuesQ, (snap) => {
       userIssues = snap.docs.map((d) => d.data() as Issue);
       calculate();
+    }, (error) => {
+      console.error("useUserStats issues snapshot error:", error);
+      setLoading(false);
     });
 
     const unsubVerifications = onSnapshot(verificationsQ, (snap) => {
       userVerifications = snap.docs.map((d) => d.data() as Verification);
       calculate();
+    }, (error) => {
+      console.error("useUserStats verifications snapshot error:", error);
+      setLoading(false);
     });
 
     return () => {
       unsubIssues();
       unsubVerifications();
     };
-  }, [user]);
+  }, [user?.id]);
 
   return {
     stats,

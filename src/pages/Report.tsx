@@ -260,6 +260,13 @@ export function Report() {
         const checkLat = lat !== null ? lat : 28.6139;
         const checkLng = lng !== null ? lng : 77.209;
 
+        const q = query(
+          collection(db, "issues"),
+          where("category", "==", analysisResult.category),
+        );
+        const snapshot = await getDocs(q);
+        const existingIssues = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+
         const res = await fetch("/api/detect-duplicates", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -268,6 +275,7 @@ export function Report() {
             lat: checkLat,
             lng: checkLng,
             description,
+            issues: existingIssues
           }),
         });
 
